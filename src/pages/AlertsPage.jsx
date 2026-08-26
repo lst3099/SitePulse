@@ -13,6 +13,8 @@ const TYPE_LABELS = {
   'sync-failed': '同步失败',
   'expired-permission-allowed': '过期权限仍允许通行',
   'age-warning': '年龄预警',
+  'tool-inspection-start': '工具检查提醒',
+  'tool-inspection-overdue': '工具检查逾期',
 };
 
 export function getVisibleAlerts(user, alerts = []) {
@@ -73,7 +75,7 @@ export function getAlertReceiverLabel(alert) {
   return (alert?.receivers || []).map((receiver) => labels[receiver] || receiver).join('、') || '未配置';
 }
 
-export default function AlertsPage({ role, lifecycleState, projectsRecords = mockData.projects, alerts: sharedAlerts, onAlertsChange, onOperationLog }) {
+export default function AlertsPage({ role, lifecycleState, projectsRecords = mockData.projects, alerts: sharedAlerts, onAlertsChange, onOperationLog, onOpenToolAlert }) {
   const projects = scopedProjects(role, lifecycleState, projectsRecords);
   const devices = useMemo(() => makeDeviceRows(role, lifecycleState), [lifecycleState, role]);
   const [filters, setFilters] = useState({ projectId: 'all', type: 'all', read: 'all', status: 'all' });
@@ -116,7 +118,7 @@ export default function AlertsPage({ role, lifecycleState, projectsRecords = moc
     { title: '发生时间', dataIndex: 'occurredAt', key: 'occurredAt' },
     { title: '处理状态', key: 'status', render: (_, alert) => alert.status === 'closed' ? <StatusTag status="success" label="已自动关闭" /> : <StatusTag status="warning" label="当前告警" /> },
     { title: '接收人', key: 'receivers', render: (_, alert) => getAlertReceiverLabel(alert) },
-    { title: '操作', key: 'action', render: (_, alert) => <Space><Button type="link" onClick={() => setDetail({ type: 'alert', data: { ...alert, type: alertTypeLabel(alert.type) } })}>详情</Button>{!alert.read && <Button type="link" onClick={() => markRead(alert)}>标记已读</Button>}</Space> },
+    { title: '操作', key: 'action', render: (_, alert) => <Space><Button type="link" onClick={() => setDetail({ type: 'alert', data: { ...alert, type: alertTypeLabel(alert.type) } })}>详情</Button>{['tool-inspection-start', 'tool-inspection-overdue'].includes(alert.type) && <Button type="link" onClick={() => onOpenToolAlert?.(alert)}>查看工具</Button>}{!alert.read && <Button type="link" onClick={() => markRead(alert)}>标记已读</Button>}</Space> },
   ];
 
   return <div className="business-page">

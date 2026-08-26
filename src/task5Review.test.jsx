@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import App, { getSafeViewForRole } from './App';
 import AttendancePage, { buildAttendanceRows, canViewCapture, createLeaveRecord, getCaptureForEvent, getPermissionMarkers, isPersonInProject, voidSupplementRecord } from './pages/AttendancePage';
 import AlertsPage, { buildAgeWarningAlerts, getAlertReceiverLabel, getVisibleAlerts, markAlertRead, syncDeviceAlertState } from './pages/AlertsPage';
-import PeoplePage, { buildPersonRecord } from './pages/PeoplePage';
+import PeoplePage, { buildPersonRecord, getBoundProjectMessage, getBoundProjectNames } from './pages/PeoplePage';
 import DevicesPage from './pages/DevicesPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import ReportsPage, { getReportRows } from './pages/ReportsPage';
@@ -82,6 +82,40 @@ describe('Task 5 PC pages', () => {
     expect(created.error).toBeUndefined();
     expect(created.account).toMatchObject({ role: 'worker', personId: 'person-2', status: 'active' });
     expect(invalid.error).toContain('必须关联已有人员');
+  });
+
+  it('derives person account state from the shared accounts collection', () => {
+    const rows = makePersonRows(admin, createLifecycleState(), undefined, mockData.projectPeople, [], mockData.people, mockData.projects, mockData.accounts);
+    expect(rows.find((row) => row.id === 'person-1')).toMatchObject({ accountName: '施工人员张伟', accountBindingState: 'bound', accountStatus: 'active' });
+    expect(rows.find((row) => row.id === 'person-2')).toMatchObject({ accountBindingState: 'unbound' });
+
+    const inactiveAccounts = mockData.accounts.map((account) => account.accountId === 'account-worker-1' ? { ...account, status: 'inactive' } : account);
+    expect(makePersonRows(admin, createLifecycleState(), undefined, mockData.projectPeople, [], mockData.people, mockData.projects, inactiveAccounts).find((row) => row.id === 'person-1')).toMatchObject({ accountBindingState: 'inactive', accountStatus: 'inactive' });
+    expect(renderToStaticMarkup(<PeoplePage role={admin} lifecycleState={createLifecycleState()} accounts={mockData.accounts} />)).toContain('账号绑定');
+    expect(renderToStaticMarkup(<PeoplePage role={{ role: 'projectOwner', projectIds: ['project-a'] }} lifecycleState={createLifecycleState()} accounts={mockData.accounts} />)).not.toContain('绑定账号');
+  });
+
+  it('renders worker account binding operations in the read-only log page', () => {
+    const markup = renderToStaticMarkup(<OperationLogsPage role={admin} operationLogs={[
+      { id: 'account-bind-log', projectId: 'project-a', operatorId: 'account-admin', operation: 'accountBind', module: 'people', targetId: 'person-2', accountId: 'account-worker-2', occurredAt: '2026-08-25 12:00', reason: '绑定施工人员账号' },
+      { id: 'account-unbind-log', projectId: 'project-a', operatorId: 'account-admin', operation: 'accountUnbind', module: 'people', targetId: 'person-2', accountId: 'account-worker-2', occurredAt: '2026-08-25 12:01', reason: '解除人员账号关联' },
+    ]} />);
+
+    expect(markup).toContain('绑定施工人员账号');
+    expect(markup).toContain('解除施工人员账号关联');
+  });
+
+  it('shows bound project count as a compact detail trigger', () => {
+    const rows = makePersonRows(admin, createLifecycleState(), undefined, mockData.projectPeople, [], mockData.people, mockData.projects, mockData.accounts);
+    const person = rows.find((row) => row.id === 'person-1');
+    const markup = renderToStaticMarkup(<PeoplePage role={admin} lifecycleState={createLifecycleState()} accounts={mockData.accounts} />);
+
+    expect(getBoundProjectNames(person)).toEqual(['滨江综合体项目', '北站枢纽项目']);
+    expect(getBoundProjectMessage(person)).toContain('已绑定项目：滨江综合体项目、北站枢纽项目');
+    expect(markup).toContain('绑定项目');
+    expect(markup).not.toContain('项目及关系');
+    expect(markup).not.toContain('在场状态');
+    expect(markup).not.toContain('项目数');
   });
 
   it('rejects a worker account when the linked person is not in the selected project', () => {
@@ -265,7 +299,7 @@ describe('Task 5 PC pages', () => {
     expect(makeDeviceRows(admin, state, [authorization]).find((device) => device.id === 'device-b-main')).toMatchObject({ accessStatus: 'revoked', effectivePermission: false });
     expect(renderToStaticMarkup(<PeoplePage role={admin} lifecycleState={state} authorizations={[authorization]} />)).toContain('特殊授权有效期内');
     expect(renderToStaticMarkup(<DevicesPage role={admin} lifecycleState={state} authorizations={[authorization]} />)).toContain('权限同步');
-    expect(renderToStaticMarkup(<ProjectDetailPage role={admin} lifecycleState={state} selectedProjectId="project-b" authorizations={[authorization]} />)).toContain('项目考勤');
+    expect(renderToStaticMarkup(<ProjectDetailPage role={admin} lifecycleState={state} selectedProjectId="project-b" authorizations={[authorization]} />)).toContain('考勤记录');
   });
 
   it('revokes person access when a project has no effective device', () => {
@@ -398,11 +432,28 @@ describe('Task 5 PC pages', () => {
 
   it('persists person project relationships and initializes new person rows safely', () => {
     const result = buildPersonRecord({ name: '新人员', projectId: 'project-a', status: 'active' }, { projectPeople: [], projects: mockData.projects, user: admin });
+    const unassigned = buildPersonRecord({ name: '待分配人员' }, { projectPeople: [], projects: mockData.projects, user: admin });
 
     expect(result.error).toBeUndefined();
     expect(result.person.projectRelationships).toEqual([expect.objectContaining({ projectId: 'project-a', personId: result.person.personId })]);
     expect(result.projectPeople).toEqual([expect.objectContaining({ projectId: 'project-a', personId: result.person.personId })]);
+    expect(unassigned.error).toBeUndefined();
+    expect(unassigned).toMatchObject({ person: { projectIds: [], projectCount: 0, projectRelationships: [] }, projectPeople: [] });
     expect(buildPersonRecord({ name: '越权人员', projectId: 'project-b', status: 'active' }, { projectPeople: [], projects: mockData.projects, user: { role: 'projectOwner', projectIds: ['project-a'] } }).error).toContain('无权');
+  });
+
+  it('keeps project names and uploaded person materials when creating a person', () => {
+    const result = buildPersonRecord({
+      name: '上传资料人员',
+      projectId: 'project-a',
+      faceImage: [{ uid: 'face-1', name: 'face.jpg' }],
+      healthReport: [{ uid: 'health-1', name: 'health.jpg' }],
+      qualifications: [{ uid: 'certificate-1', name: 'certificate-a.jpg' }, { uid: 'certificate-2', name: 'certificate-b.jpg' }],
+    }, { projectPeople: [], projects: mockData.projects, user: admin });
+
+    expect(result.person).toMatchObject({ registered: true, healthReportStatus: 'valid' });
+    expect(result.person.projectRelationships[0]).toMatchObject({ projectId: 'project-a', projectName: '滨江综合体项目' });
+    expect(result.person.qualifications).toHaveLength(2);
   });
 
   it('allows project lifecycle and edits only for system admins or scoped project owners', () => {

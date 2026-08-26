@@ -3,7 +3,6 @@ import {
   AlertOutlined,
   AppstoreOutlined,
   AuditOutlined,
-  BookOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   FileTextOutlined,
@@ -13,7 +12,6 @@ import {
   MenuUnfoldOutlined,
   MobileOutlined,
   SafetyCertificateOutlined,
-  SettingOutlined,
   TeamOutlined,
   ToolOutlined,
   UserOutlined,
@@ -34,12 +32,10 @@ const KNOWN_ROLES = new Set(Object.keys(ROLE_LABELS));
 const MENU_DEFINITIONS = [
   { key: 'workbench', label: '工作台', icon: <DashboardOutlined /> },
   { key: 'projectOverview', label: '项目管理', icon: <AppstoreOutlined /> },
-  { key: 'people', label: '人员管理', icon: <TeamOutlined /> },
+  { key: 'people', label: '人员档案', icon: <TeamOutlined /> },
   { key: 'deviceAccess', label: '设备与门禁', icon: <SafetyCertificateOutlined /> },
-  { key: 'deviceRegistration', label: '设备登记', icon: <SettingOutlined />, systemOnly: true },
-  { key: 'attendance', label: '考勤管理', icon: <AuditOutlined /> },
-  { key: 'health', label: '健康报告与年龄限制', icon: <BookOutlined /> },
-  { key: 'tools', label: '工器具', icon: <ToolOutlined /> },
+  { key: 'accessRecords', label: '门禁记录', icon: <AuditOutlined /> },
+  { key: 'tools', label: '工具管理', icon: <ToolOutlined /> },
   { key: 'alerts', label: '告警中心', icon: <AlertOutlined /> },
   { key: 'reports', label: '报表中心', icon: <FileTextOutlined /> },
   { key: 'basicData', label: '基础资料', icon: <DatabaseOutlined /> },
@@ -61,7 +57,6 @@ export function getShellMenu(role) {
 
   return MENU_DEFINITIONS
     .filter((item) => !item.systemOnly || user.role === 'systemAdmin')
-    .filter((item) => item.key !== 'deviceRegistration' || canOperate(user, 'bindDevice', { deviceRegistered: true }))
     .map(({ systemOnly, ...item }) => item);
 }
 

@@ -5,9 +5,11 @@ import mockData from '../../data/mockData';
 export const MOBILE_VIEW_KEYS = new Set([
   'mobileAttendance',
   'mobileOverview',
+  'mobileTools',
   'mobileProjects',
   'mobileFaceSync',
   'mobileProfile',
+  'mobileTool',
 ]);
 
 function isEnabledProject(project) {

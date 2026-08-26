@@ -5,7 +5,7 @@ import AppShell, { getShellMenu } from './AppShell';
 import StatusTag from './StatusTag';
 import PageHeader from './PageHeader';
 import FilterBar from './FilterBar';
-import { getEditableProjectOptions, PersonDrawerContent, submitPersonEdit } from './PersonDrawer';
+import { getEditableProjectOptions, getUniqueFieldRule, PersonDrawerContent, submitPersonEdit } from './PersonDrawer';
 import { DeviceBindingForm } from './DeviceBindingDrawer';
 import { DetailDrawerContent } from './DetailDrawer';
 
@@ -34,11 +34,13 @@ describe('PC shell and shared components', () => {
 
     expect(admin).toContain('工作台');
     expect(admin).toContain('用户与权限');
-    expect(admin).toContain('设备登记');
+    expect(admin).not.toContain('设备登记');
+    expect(admin).not.toContain('健康报告与年龄限制');
     expect(admin).toContain('管理内容');
     expect(owner).not.toContain('用户与权限');
     expect(owner).not.toContain('操作日志');
     expect(owner).not.toContain('设备登记');
+    expect(owner).not.toContain('健康报告与年龄限制');
     expect(worker).toContain('移动端考勤');
     expect(worker).not.toContain('项目管理');
   });
@@ -48,9 +50,9 @@ describe('PC shell and shared components', () => {
       <>
         <StatusTag status="syncing" />
         <PageHeader
-          title="人员管理"
+          title="人员档案"
           description="维护项目人员档案"
-          breadcrumb={['项目管理', '人员管理']}
+          breadcrumb={['项目管理', '人员档案']}
           extra={<button type="button">新增人员</button>}
         />
         <FilterBar onReset={() => {}} onSearch={() => {}}>
@@ -76,6 +78,7 @@ describe('PC shell and shared components', () => {
         person={{ projectId: 'project-a', personId: 'person-9', name: '李娜', phone: '13800000000', status: 'active', registered: true }}
       />,
     );
+    const editablePerson = render(<PersonDrawerContent mode="edit" role={{ role: 'systemAdmin' }} person={{ projectId: 'project-a', projectOptions: [{ value: 'project-a', label: '项目 A' }] }} onSubmit={() => {}} />);
     const binding = render(
       <DeviceBindingForm role={{ role: 'projectOwner', projectIds: ['project-a'] }} projectId="project-b" />,
     );
@@ -86,7 +89,9 @@ describe('PC shell and shared components', () => {
     expect(person).toContain('项目关系');
     expect(person).toContain('门禁资料');
     expect(person).toContain('健康报告/资质证书');
-    expect(person).toContain('现场采集不支持');
+    expect(editablePerson).toContain('人脸照片');
+    expect(editablePerson).toContain('上传健康报告图片');
+    expect(editablePerson).toContain('上传资质证书图片');
     expect(person).not.toContain('姓名');
     expect(person).not.toContain('联系电话');
     expect(person).not.toContain('所属项目');
@@ -128,6 +133,20 @@ describe('PC shell and shared components', () => {
     expect(submitted).toBe(false);
     expect(submitPersonEdit(owner, { projectId: 'project-a' }, () => { submitted = true; })).toBe(true);
     expect(submitted).toBe(true);
+  });
+
+  it('requires core person fields and rejects duplicate identity or contact values', async () => {
+    const markup = render(<PersonDrawerContent mode="edit" role={{ role: 'systemAdmin' }} person={{ projectId: 'project-a', projectOptions: [{ value: 'project-a', label: '项目 A' }] }} onSubmit={() => {}} />);
+    const phoneRule = getUniqueFieldRule('phone', '联系电话', [{ id: 'person-1', phone: '13800000000' }], 'person-2');
+    const idCardRule = getUniqueFieldRule('idCardNumber', '身份证号', [{ id: 'person-1', idCardNumber: 'mock-id-001' }], 'person-2');
+
+    expect(markup).not.toContain('账号');
+    expect(markup).toContain('姓名');
+    expect(markup).toContain('身份证号');
+    expect(markup).toContain('联系电话');
+    await expect(phoneRule.validator(undefined, '13800000000')).rejects.toThrow('联系电话已存在');
+    await expect(idCardRule.validator(undefined, 'mock-id-001')).rejects.toThrow('身份证号已存在');
+    await expect(phoneRule.validator(undefined, '13900000000')).resolves.toBeUndefined();
   });
 
   it('does not expose drawer submit paths when their callbacks are missing', () => {

@@ -12,7 +12,10 @@ dist/
 .env.*
 !.env.example
 /*.md
+!/CLAUDE.md
 docs/
+workspace/source-materials/*
+!workspace/source-materials/CLAUDE.md
 *.apk
 *.chm
 *.zip

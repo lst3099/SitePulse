@@ -10,6 +10,7 @@ import ProfilePage, { saveLocalPasswordSettings } from './pages/mobile/ProfilePa
 import ProjectSwitchPage, { getAuthorizedProjects, switchMobileProject } from './pages/mobile/ProjectSwitchPage';
 import { selectAttendanceMonth } from './pages/mobile/AttendanceOverviewPage';
 import MobileShell, { NAV_ITEMS } from './components/MobileShell';
+import mockData from './data/mockData';
 
 const render = (element) => renderToStaticMarkup(element);
 
@@ -25,17 +26,18 @@ describe('Task 6 移动端原型', () => {
   it('worker 始终进入移动端壳层，不显示 PC 管理导航', () => {
     const markup = render(<App initialRole={worker} />);
 
-    expect(markup).toContain('今日');
+    expect(markup).toContain('打卡记录');
     expect(markup).toContain('我的考勤');
     expect(markup).not.toContain('工作台');
     expect(markup).not.toContain('项目管理');
     expect(markup).not.toContain('用户与权限');
   });
 
-  it('移动端五个页面均可按页面状态渲染', () => {
+  it('移动端页面均可按页面状态渲染', () => {
     const pages = [
       ['mobileAttendance', '我的考勤'],
       ['mobileOverview', '考勤概览'],
+      ['mobileTools', '工具管理'],
       ['mobileProjects', '项目切换'],
       ['mobileFaceSync', '人脸同步'],
       ['mobileProfile', '个人信息'],
@@ -251,12 +253,76 @@ describe('Task 6 移动端原型', () => {
     expect(saveLocalPasswordSettings()).toMatchObject({ feedback: '密码已更新（本地演示状态）' });
   });
 
-  it('我的考勤和考勤概览提供真实日期与月份选择器', () => {
+  it('我的考勤使用月历选择日期，考勤概览保留月份选择器', () => {
     const project = { id: 'project-a', name: '项目 A', status: 'active', workStart: '09:00', workEnd: '18:00' };
     const attendance = [{ projectId: 'project-a', personId: 'person-1', deviceId: 'device-1', eventSerial: 'event-1', eventTime: '2026-08-26T09:00:00+08:00', personRegistered: true, faceRecognition: 'success', direction: 'in', devicePermission: 'allow' }];
 
-    expect(render(<MyAttendancePage project={project} currentPersonId="person-1" peopleRecords={[{ id: 'person-1', name: '张伟' }]} attendance={attendance} leaveRecords={[]} date="2026-08-26" />)).toContain('ant-picker');
+    expect(render(<MyAttendancePage project={project} currentPersonId="person-1" peopleRecords={[{ id: 'person-1', name: '张伟' }]} attendance={attendance} leaveRecords={[]} date="2026-08-26" />)).toContain('考勤月历');
     expect(render(<AttendanceOverviewPage project={project} currentPersonId="person-1" attendance={attendance} leaveRecords={[]} month="2026-08" asOfDate="2026-08-26" />)).toContain('ant-picker');
+  });
+
+  it('打卡记录跟随顶部当前项目展示，并在月历标记出勤日', () => {
+    const projects = [
+      { id: 'project-a', name: '项目 A', status: 'active', workStart: '09:00', workEnd: '18:00' },
+      { id: 'project-b', name: '项目 B', status: 'active', workStart: '08:30', workEnd: '17:30' },
+      { id: 'project-c', name: '外部工程 C', status: 'active', workStart: '09:00', workEnd: '18:00' },
+    ];
+    const attendance = [
+      { id: 'event-a-in', projectId: 'project-a', personId: 'person-1', deviceId: 'device-a-in', eventSerial: 'a-in', eventTime: '2026-08-25T08:58:00+08:00', personRegistered: true, faceRecognition: 'success', direction: 'in', devicePermission: 'allow' },
+      { id: 'event-b-out', projectId: 'project-b', personId: 'person-1', deviceId: 'device-b-main', eventSerial: 'b-out', eventTime: '2026-08-25T17:35:00+08:00', personRegistered: true, faceRecognition: 'success', direction: 'out', devicePermission: 'allow' },
+    ];
+    const markup = render(
+      <App
+        initialRole={worker}
+        initialView="mobileAttendance"
+        initialProjectsRecords={projects}
+        initialPeopleRecords={[{ id: 'person-1', name: '张伟' }]}
+        initialProjectPeople={[
+          { projectId: 'project-a', personId: 'person-1', status: 'active' },
+          { projectId: 'project-b', personId: 'person-1', status: 'active' },
+        ]}
+        attendance={attendance}
+      />,
+    );
+
+    expect(markup).not.toContain('项目范围');
+    expect(markup).not.toContain('全部项目');
+    expect(markup).toContain('绑定 2 个项目');
+    expect(markup).toContain('项目 A');
+    expect(markup).not.toContain('项目 B');
+    expect(markup).not.toContain('外部工程 C');
+    expect(markup).toContain('上班打卡');
+    expect(markup).not.toContain('下班打卡');
+    expect(markup).toContain('2026年8月25日');
+    expect(markup).toContain('calendar-dot');
+
+    const switchedMarkup = render(
+      <App
+        initialRole={worker}
+        initialView="mobileAttendance"
+        initialCurrentProjectId="project-b"
+        initialProjectsRecords={projects}
+        initialPeopleRecords={[{ id: 'person-1', name: '张伟' }]}
+        initialProjectPeople={[
+          { projectId: 'project-a', personId: 'person-1', status: 'active' },
+          { projectId: 'project-b', personId: 'person-1', status: 'active' },
+        ]}
+        attendance={attendance}
+      />,
+    );
+
+    expect(switchedMarkup).toContain('项目 B');
+    expect(switchedMarkup).not.toContain('项目 A');
+    expect(switchedMarkup).toContain('下班打卡');
+  });
+
+  it('打卡记录页不重复展示日期选择和项目记录摘要，并使用多天有效打卡样例标记月历', () => {
+    const markup = render(<MyAttendancePage project={mockData.projects[0]} currentPersonId="person-1" peopleRecords={mockData.people} attendance={mockData.rawEvents} leaveRecords={[]} date="2026-08-25" />);
+
+    expect(markup).not.toContain('快速选择日期');
+    expect(markup).not.toContain('涉及 1 个项目');
+    expect(markup).not.toContain('有效记录 2 条');
+    expect(markup.match(/calendar-dot/g)).toHaveLength(4);
   });
 
   it('个人信息提供本地账号设置和修改密码原型反馈入口', () => {
@@ -267,11 +333,22 @@ describe('Task 6 移动端原型', () => {
     expect(markup).toContain('保存本地演示设置');
   });
 
-  it('MobileShell 底部导航包含人脸同步且 worker 路由可达', () => {
-    const markup = render(<MobileShell title="人脸同步" currentProject={{ name: '项目 A', status: 'active' }} activeView="mobileFaceSync"><div>同步内容</div></MobileShell>);
+  it('MobileShell 底部导航保留三个业务入口', () => {
+    const markup = render(<MobileShell title="打卡记录" currentProject={{ name: '项目 A', status: 'active' }} activeView="mobileAttendance"><div>导航内容</div></MobileShell>);
 
-    expect(NAV_ITEMS.map((item) => item.key)).toEqual(['mobileAttendance', 'mobileOverview', 'mobileProjects', 'mobileFaceSync', 'mobileProfile']);
-    expect(markup).toContain('人脸同步');
+    expect(NAV_ITEMS.map(({ key, label }) => [key, label])).toEqual([
+      ['mobileAttendance', '打卡记录'],
+      ['mobileTools', '工具管理'],
+      ['mobileProfile', '我的'],
+    ]);
+    expect(markup).toContain('anticon-down');
+    expect(markup).not.toContain('考勤概览');
+    expect(markup).toContain('工具管理');
+    expect(markup).toContain('打卡记录');
+    expect(markup).toContain('我的');
+    expect(markup).not.toContain('项目切换');
+    expect(markup).not.toContain('人脸同步');
+    expect(render(<App initialRole={worker} initialView="mobileTools" />)).toContain('工具管理');
     expect(render(<App initialRole={worker} initialView="mobileFaceSync" />)).toContain('人脸同步');
   });
 });

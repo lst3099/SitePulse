@@ -6,7 +6,7 @@ import { canOperate, filterByDataScope } from '../domain/permissions';
 import mockData from '../data/mockData';
 import { DEMO_AS_OF_DATE, getSpecialAuthorizationStatus, makePersonRows, normalizeUser, scopedProjects, toDatePickerValue, toDateTimeKey } from './pageUtils';
 
-const AUTH_STATUS_META = {
+export const AUTH_STATUS_META = {
   pending: { label: '生效前', status: 'warning' },
   active: { label: '有效期内', status: 'success' },
   expired: { label: '已失效', status: 'error' },

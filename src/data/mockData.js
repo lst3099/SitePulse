@@ -27,6 +27,7 @@ export const accounts = [
   { accountId: 'account-owner-a', name: '项目负责人甲', role: 'projectOwner', projectIds: ['project-a'], status: 'active' },
   { accountId: 'account-guard-a', name: '考勤负责人/门卫', role: 'attendanceGuard', projectIds: ['project-a'], status: 'inactive' },
   { accountId: 'account-worker-1', name: '施工人员张伟', role: 'worker', personId: 'person-1', projectIds: ['project-a', 'project-b'], status: 'active' },
+  { accountId: 'account-worker-2', name: '待绑定施工人员账号', role: 'worker', projectIds: ['project-a'], status: 'active' },
 ];
 
 export const users = accounts;
@@ -41,6 +42,7 @@ export const devices = [
   { id: 'device-a-in', entranceId: 'entrance-a-in', projectId: 'project-a', registered: true },
   { id: 'device-a-out', entranceId: 'entrance-a-out', projectId: 'project-a', registered: true },
   { id: 'device-b-main', entranceId: 'entrance-b-main', projectId: 'project-b', registered: true },
+  { id: 'device-unbound-1', platformId: 'PLAT-004', hikvisionSerial: 'HIK-UNBOUND-004', model: 'DS-K1T341', registered: true, online: true, personnelSync: 'notStarted', faceSync: 'notStarted', permissionSync: 'notStarted', syncStatus: 'notStarted' },
 ];
 
 export const rawEvents = [
@@ -77,6 +79,36 @@ export const rawEvents = [
   {
     id: 'event-6-other-device', projectId: 'project-a', personId: 'person-1', deviceId: 'device-a-out', eventSerial: 'serial-1',
     eventTime: '2026-08-25T08:58:00+08:00', source: 'realtime', personRegistered: true, faceRecognition: 'success',
+    direction: 'out', doorOpened: true, permissionStatus: 'valid',
+  },
+  {
+    id: 'event-7-entry', projectId: 'project-a', personId: 'person-1', deviceId: 'device-a-in', eventSerial: 'serial-18-in',
+    eventTime: '2026-08-18T08:56:00+08:00', source: 'realtime', personRegistered: true, faceRecognition: 'success',
+    direction: 'in', doorOpened: true, permissionStatus: 'valid',
+  },
+  {
+    id: 'event-8-exit', projectId: 'project-a', personId: 'person-1', deviceId: 'device-a-out', eventSerial: 'serial-18-out',
+    eventTime: '2026-08-18T18:03:00+08:00', source: 'realtime', personRegistered: true, faceRecognition: 'success',
+    direction: 'out', doorOpened: true, permissionStatus: 'valid',
+  },
+  {
+    id: 'event-9-entry', projectId: 'project-a', personId: 'person-1', deviceId: 'device-a-in', eventSerial: 'serial-20-in',
+    eventTime: '2026-08-20T09:27:00+08:00', source: 'realtime', personRegistered: true, faceRecognition: 'success',
+    direction: 'in', doorOpened: true, permissionStatus: 'valid',
+  },
+  {
+    id: 'event-10-exit', projectId: 'project-a', personId: 'person-1', deviceId: 'device-a-out', eventSerial: 'serial-20-out',
+    eventTime: '2026-08-20T18:01:00+08:00', source: 'realtime', personRegistered: true, faceRecognition: 'success',
+    direction: 'out', doorOpened: true, permissionStatus: 'valid',
+  },
+  {
+    id: 'event-11-entry', projectId: 'project-a', personId: 'person-1', deviceId: 'device-a-in', eventSerial: 'serial-22-in',
+    eventTime: '2026-08-22T08:48:00+08:00', source: 'realtime', personRegistered: true, faceRecognition: 'success',
+    direction: 'in', doorOpened: true, permissionStatus: 'valid',
+  },
+  {
+    id: 'event-12-exit', projectId: 'project-a', personId: 'person-1', deviceId: 'device-a-out', eventSerial: 'serial-22-out',
+    eventTime: '2026-08-22T17:32:00+08:00', source: 'realtime', personRegistered: true, faceRecognition: 'success',
     direction: 'out', doorOpened: true, permissionStatus: 'valid',
   },
 ];
@@ -120,6 +152,27 @@ export const specialAuthorizations = [
   { id: 'authorization-1', projectId: 'project-a', personId: 'person-1', type: '临时夜班', status: 'active', operatorId: 'account-owner-a', basis: '夜间施工审批单', effectiveAt: '2026-08-01', expiresAt: '2026-09-01' },
 ];
 
+export const tools = [
+  { id: 'tool-1', toolCode: 'TL-000001', name: '塔吊安全绳', model: 'TL-5M', projectId: 'project-a', usageStatus: '在用', qrToken: 'tool-token-1', createdAt: '2026-07-20' },
+  { id: 'tool-2', toolCode: 'TL-000002', name: '绝缘手套', model: '10KV-A', projectId: 'project-a', usageStatus: '在用', qrToken: 'tool-token-2', createdAt: '2026-07-20' },
+  { id: 'tool-3', toolCode: 'TL-000003', name: '扭力扳手', model: 'TW-300', projectId: 'project-b', usageStatus: '在用', qrToken: 'tool-token-3', createdAt: '2026-07-20' },
+  { id: 'tool-4', toolCode: 'TL-000004', name: '电焊机', model: 'ZX7-400', projectId: 'project-a', usageStatus: '遗失', qrToken: 'tool-token-4', createdAt: '2026-07-20', remark: '现场盘点未找到' },
+  { id: 'tool-5', toolCode: 'TL-000005', name: '手持切割机', model: 'J3G-400', projectId: 'project-b', usageStatus: '报废', qrToken: 'tool-token-5', createdAt: '2026-07-20', remark: '设备损坏无法维修' },
+];
+
+export const toolInspectionPolicy = {
+  id: 'tool-policy-default',
+  enabled: true,
+  frequency: 'monthly',
+  day: 1,
+  expectedDays: 3,
+};
+
+export const toolInspections = [
+  { id: 'tool-inspection-1', toolId: 'tool-1', projectId: 'project-a', cycleKey: '2026-08', inspectedAt: '2026-08-01', inspectorId: 'account-owner-a', inspectorName: '项目负责人甲', result: '合格', remark: '外观和强度正常' },
+  { id: 'tool-inspection-2', toolId: 'tool-3', projectId: 'project-b', cycleKey: '2026-08', inspectedAt: '2026-08-02', inspectorId: 'account-admin', inspectorName: '系统管理员', result: '不合格', remark: '扭力校准异常，需处理' },
+];
+
 export const operationLogs = [
   { id: 'operation-1', projectId: 'project-a', operatorId: 'account-owner-a', operation: 'supplement', module: 'attendance', targetId: 'supplement-1', occurredAt: '2026-08-25 09:20', reason: '设备离线补录' },
   { id: 'operation-2', projectId: 'project-a', operatorId: 'account-admin', operation: 'bind', module: 'devices', targetId: 'device-a-in', occurredAt: '2026-08-25 08:30', reason: '绑定东门入口' },
@@ -160,6 +213,9 @@ export const mockData = {
   specialAuthorizations,
   operationLogs,
   permissionSyncRecords,
+  tools,
+  toolInspectionPolicy,
+  toolInspections,
   alerts,
 };
 

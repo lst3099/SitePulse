@@ -118,10 +118,10 @@ export function buildAttendanceRows({
     }));
 }
 
-export default function AttendancePage({ role, lifecycleState, projectsRecords = mockData.projects, peopleRecords = mockData.people, projectPeople = mockData.projectPeople, supplements: sharedSupplements, onSupplementsChange, leaveRecords: sharedLeaves, onLeaveRecordsChange, onOperationLog }) {
+export default function AttendancePage({ role, lifecycleState, projectsRecords = mockData.projects, peopleRecords = mockData.people, projectPeople = mockData.projectPeople, rawEvents = mockData.rawEvents, fixedProjectId, embedded = false, supplements: sharedSupplements, onSupplementsChange, leaveRecords: sharedLeaves, onLeaveRecordsChange, onOperationLog }) {
   const user = normalizeUser(role);
   const projects = scopedProjects(role, lifecycleState, projectsRecords);
-  const [filters, setFilters] = useState({ projectId: 'all', personId: 'all', date: DEFAULT_DATE });
+  const [filters, setFilters] = useState({ projectId: fixedProjectId || 'all', personId: 'all', date: DEFAULT_DATE });
   const [appliedFilters, setAppliedFilters] = useState(filters);
   const [localSupplements, setLocalSupplements] = useState(sharedSupplements || mockData.supplementRecords);
   const [localLeaves, setLocalLeaves] = useState(sharedLeaves || mockData.leaveRecords);
@@ -134,10 +134,11 @@ export default function AttendancePage({ role, lifecycleState, projectsRecords =
   const leaveProjectId = Form.useWatch('projectId', leaveForm);
 
   const peopleOptions = useMemo(() => {
-    const projectIds = appliedFilters.projectId === 'all' ? projects.map((project) => project.id) : [appliedFilters.projectId];
+    const selectedProjectId = fixedProjectId || appliedFilters.projectId;
+    const projectIds = selectedProjectId === 'all' ? projects.map((project) => project.id) : [selectedProjectId];
     const ids = new Set(projectPeople.filter((relation) => projectIds.includes(relation.projectId)).map((relation) => relation.personId));
     return peopleRecords.filter((person) => ids.has(person.id)).map((person) => ({ value: person.id, label: person.name }));
-  }, [appliedFilters.projectId, peopleRecords, projectPeople, projects]);
+  }, [appliedFilters.projectId, fixedProjectId, peopleRecords, projectPeople, projects]);
   const peopleOptionsForProject = (projectId) => peopleRecords
     .filter((person) => isPersonInProject(projectId, person.id, projectPeople))
     .map((person) => ({ value: person.id, label: person.name }));
@@ -146,17 +147,20 @@ export default function AttendancePage({ role, lifecycleState, projectsRecords =
   const rows = useMemo(() => buildAttendanceRows({
     role,
     projects,
+    rawEvents,
     date: appliedFilters.date,
-    projectId: appliedFilters.projectId === 'all' ? undefined : appliedFilters.projectId,
+    projectId: (fixedProjectId || appliedFilters.projectId) === 'all' ? undefined : (fixedProjectId || appliedFilters.projectId),
     personId: appliedFilters.personId === 'all' ? undefined : appliedFilters.personId,
     supplements: localSupplements,
     leaves: localLeaves,
     projectPeople,
     peopleRecords,
-  }), [appliedFilters, localLeaves, localSupplements, peopleRecords, projectPeople, projects, role]);
+  }), [appliedFilters, fixedProjectId, localLeaves, localSupplements, peopleRecords, projectPeople, projects, rawEvents, role]);
   const rawRows = rows.flatMap((row) => row.rawRecords.map((event) => ({ ...event, capture: getCaptureForEvent(event), projectName: row.projectName, personName: row.personName })));
-  const canSupplement = canOperate(user, 'supplement', { projectId: appliedFilters.projectId === 'all' ? projects[0]?.id : appliedFilters.projectId });
-  const canLeave = canOperate(user, 'leave', { projectId: appliedFilters.projectId === 'all' ? projects[0]?.id : appliedFilters.projectId });
+  const selectedProjectId = fixedProjectId || (appliedFilters.projectId === 'all' ? projects[0]?.id : appliedFilters.projectId);
+  const formProjects = fixedProjectId ? projects.filter((project) => project.id === fixedProjectId) : projects;
+  const canSupplement = canOperate(user, 'supplement', { projectId: selectedProjectId });
+  const canLeave = canOperate(user, 'leave', { projectId: selectedProjectId });
 
   const updateSupplements = (next) => {
     setLocalSupplements(next);
@@ -215,7 +219,9 @@ export default function AttendancePage({ role, lifecycleState, projectsRecords =
     message.success('请假已登记，考勤结果已更新（本地演示）');
   };
 
-  const projectOptions = [{ value: 'all', label: '全部项目' }, ...projects.map((project) => ({ value: project.id, label: project.name }))];
+  const projectOptions = fixedProjectId
+    ? projects.filter((project) => project.id === fixedProjectId).map((project) => ({ value: project.id, label: project.name }))
+    : [{ value: 'all', label: '全部项目' }, ...projects.map((project) => ({ value: project.id, label: project.name }))];
   const personSelectOptions = [{ value: 'all', label: '全部人员' }, ...peopleOptions];
   const rawColumns = [
     { title: '项目', dataIndex: 'projectName', key: 'projectName' },
@@ -241,21 +247,21 @@ export default function AttendancePage({ role, lifecycleState, projectsRecords =
     { title: '操作', key: 'action', render: (_, row) => { const activeSupplement = row.supplementRecords.find((record) => record.voided !== true && record.approved !== false); return <div className="table-actions"><Button type="link" onClick={() => setDetail({ type: row.leave ? 'leave' : 'attendance', data: row.leave || row })}>详情</Button>{activeSupplement && <Button type="link" onClick={() => setDetail({ type: 'supplement', data: activeSupplement })}>补录详情</Button>}{canSupplement && <Button type="link" onClick={() => { form.setFieldsValue({ projectId: row.projectId, personId: row.personId, date: row.date }); setSupplementOpen(true); }}>补录</Button>}</div>; } },
   ];
 
-  return <div className="business-page">
-    <PageHeader title="考勤管理" description="按项目、人员、日期查看不可修改的设备原始事件与平台汇总结果。" breadcrumb={['首页', '考勤管理']} extra={<Space>{canLeave && <Button onClick={() => setLeaveOpen(true)}>登记请假</Button>}{canSupplement && <Button type="primary" icon={<PlusOutlined />} onClick={() => setSupplementOpen(true)}>新增补录</Button>}</Space>} />
-    <div className="workday-note"><StatusTag status="normal" label="规则边界" /> 原始设备事件不可修改、不可合并；同一设备事件已去重。只有“补录”，补录只新增平台结果，不改变原始事件；不实现加班、APP补录、远程开门。</div>
+  return <div className={embedded ? 'attendance-panel' : 'business-page'}>
+    {!embedded && <PageHeader title="考勤管理" description="按项目、人员、日期查看不可修改的设备原始事件与平台汇总结果。" breadcrumb={['首页', '考勤管理']} extra={<Space>{canLeave && <Button onClick={() => setLeaveOpen(true)}>登记请假</Button>}{canSupplement && <Button type="primary" icon={<PlusOutlined />} onClick={() => setSupplementOpen(true)}>新增补录</Button>}</Space>} />}
+    {!embedded && <div className="workday-note"><StatusTag status="normal" label="规则边界" /> 原始设备事件不可修改、不可合并；同一设备事件已去重。只有“补录”，补录只新增平台结果，不改变原始事件；不实现加班、APP补录、远程开门。</div>}
     <FilterBar onReset={() => { setFilters({ projectId: 'all', personId: 'all', date: DEFAULT_DATE }); setAppliedFilters({ projectId: 'all', personId: 'all', date: DEFAULT_DATE }); }} onSearch={() => setAppliedFilters(filters)}>
-      <Select aria-label="项目筛选" value={filters.projectId} onChange={(projectId) => setFilters({ ...filters, projectId, personId: 'all' })} options={projectOptions} />
+      {!fixedProjectId && <Select aria-label="项目筛选" value={filters.projectId} onChange={(projectId) => setFilters({ ...filters, projectId, personId: 'all' })} options={projectOptions} />}
       <Input aria-label="日期筛选" type="date" value={filters.date} onChange={(event) => setFilters({ ...filters, date: event.target.value })} />
       <Select aria-label="人员筛选" value={filters.personId} onChange={(personId) => setFilters({ ...filters, personId })} options={personSelectOptions} />
     </FilterBar>
-    <Card title="设备原始事件" className="table-card" extra={<Typography.Text type="secondary">共 {rawRows.length} 条去重事件</Typography.Text>}><Table rowKey="id" columns={rawColumns} dataSource={rawRows} scroll={{ x: 1200 }} pagination={false} /></Card>
+    {!embedded && <Card title="设备原始事件" className="table-card" extra={<Typography.Text type="secondary">共 {rawRows.length} 条去重事件</Typography.Text>}><Table rowKey="id" columns={rawColumns} dataSource={rawRows} scroll={{ x: 1200 }} pagination={false} /></Card>}
     <Card title="平台考勤结果" className="table-card" extra={<Typography.Text type="secondary">按项目 + 人员 + 日期汇总有效进出</Typography.Text>}><Table rowKey={(row) => `${row.projectId}-${row.personId}-${row.date}`} columns={resultColumns} dataSource={rows} scroll={{ x: 1200 }} pagination={false} /></Card>
     <DetailDrawer open={Boolean(detail)} onClose={() => setDetail(null)} type={detail?.type} data={detail?.data} role={role} onSubmit={detail?.type === 'supplement' ? ({ voidReason }) => voidSupplement(detail.data.id, voidReason) : undefined} />
     <Drawer title="新增平台补录" open={supplementOpen} onClose={() => { setSupplementOpen(false); form.resetFields(); }} width={480} destroyOnClose>
       <Typography.Paragraph type="secondary">补录只进入平台考勤结果，设备原始事件保持只读。</Typography.Paragraph>
       <Form form={form} layout="vertical" onFinish={saveSupplement} initialValues={{ projectId: projects[0]?.id, personId: peopleOptions[0]?.value, date: appliedFilters.date, direction: 'in', time: '09:00' }}>
-        <Form.Item label="项目" name="projectId" rules={[{ required: true, message: '请选择项目' }]}><Select onChange={() => form.setFieldValue('personId', undefined)} options={projects.map((project) => ({ value: project.id, label: project.name }))} /></Form.Item>
+        <Form.Item label="项目" name="projectId" rules={[{ required: true, message: '请选择项目' }]}><Select disabled={Boolean(fixedProjectId)} onChange={() => form.setFieldValue('personId', undefined)} options={formProjects.map((project) => ({ value: project.id, label: project.name }))} /></Form.Item>
         <Form.Item label="人员" name="personId" rules={[{ required: true, message: '请选择人员' }]}><Select options={supplementPeopleOptions} /></Form.Item>
         <Form.Item label="日期" name="date" rules={[{ required: true, message: '请选择日期' }]}><Input type="date" /></Form.Item>
         <Form.Item label="方向" name="direction" rules={[{ required: true }]}><Select options={[{ value: 'in', label: '进门' }, { value: 'out', label: '出门' }]} /></Form.Item>
@@ -267,7 +273,7 @@ export default function AttendancePage({ role, lifecycleState, projectsRecords =
     <Drawer title="登记请假" open={leaveOpen} onClose={() => { setLeaveOpen(false); leaveForm.resetFields(); }} width={480} destroyOnClose>
       <Typography.Paragraph type="secondary">仅系统管理员和项目负责人可登记；登记后请假优先于节假日/休息日状态。</Typography.Paragraph>
       <Form form={leaveForm} layout="vertical" onFinish={saveLeave} initialValues={{ projectId: projects[0]?.id, personId: peopleOptions[0]?.value, date: appliedFilters.date, endDate: appliedFilters.date }}>
-        <Form.Item label="项目" name="projectId" rules={[{ required: true, message: '请选择项目' }]}><Select onChange={() => leaveForm.setFieldValue('personId', undefined)} options={projects.map((project) => ({ value: project.id, label: project.name }))} /></Form.Item>
+        <Form.Item label="项目" name="projectId" rules={[{ required: true, message: '请选择项目' }]}><Select disabled={Boolean(fixedProjectId)} onChange={() => leaveForm.setFieldValue('personId', undefined)} options={formProjects.map((project) => ({ value: project.id, label: project.name }))} /></Form.Item>
         <Form.Item label="人员" name="personId" rules={[{ required: true, message: '请选择人员' }]}><Select options={leavePeopleOptions} /></Form.Item>
         <Form.Item label="开始日期" name="date" rules={[{ required: true, message: '请选择开始日期' }]}><Input type="date" /></Form.Item>
         <Form.Item label="结束日期" name="endDate" rules={[{ required: true, message: '请选择结束日期' }]}><Input type="date" /></Form.Item>

@@ -1,12 +1,10 @@
 import React from 'react';
-import { ArrowLeftOutlined, DownOutlined, HomeOutlined, ProfileOutlined, ProjectOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, ClockCircleOutlined, DownOutlined, ToolOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Tag, Typography } from 'antd';
 
 const NAV_ITEMS = [
-  { key: 'mobileAttendance', label: '今日', icon: <HomeOutlined /> },
-  { key: 'mobileOverview', label: '考勤', icon: <ProfileOutlined /> },
-  { key: 'mobileProjects', label: '项目', icon: <ProjectOutlined /> },
-  { key: 'mobileFaceSync', label: '人脸同步', icon: <SyncOutlined /> },
+  { key: 'mobileAttendance', label: '打卡记录', icon: <ClockCircleOutlined /> },
+  { key: 'mobileTools', label: '工具管理', icon: <ToolOutlined /> },
   { key: 'mobileProfile', label: '我的', icon: <UserOutlined /> },
 ];
 
@@ -20,10 +18,13 @@ export default function MobileShell({ title, currentProject, activeView = 'mobil
           <div className="mobile-header-row">
             {onBack ? <Button type="text" aria-label="返回" icon={<ArrowLeftOutlined />} onClick={onBack} /> : <span className="mobile-header-placeholder" />}
             <Typography.Title level={4}>{title}</Typography.Title>
-            <Button type="text" aria-label="切换项目" icon={<DownOutlined />} onClick={onOpenProjectSwitch} />
+            <span className="mobile-header-placeholder" />
           </div>
           <button type="button" className="mobile-project-summary" onClick={onOpenProjectSwitch}>
-            <span>{currentProject?.name || '暂无授权项目'}</span>
+            <span className="mobile-project-switch-label">
+              <span>{currentProject?.name || '暂无授权项目'}</span>
+              <DownOutlined aria-hidden="true" />
+            </span>
             <Tag color={currentProject?.status === 'active' ? 'green' : 'default'}>{currentProject?.status === 'active' ? '使用中' : '不可用'}</Tag>
           </button>
         </header>

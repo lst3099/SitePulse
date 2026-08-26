@@ -57,13 +57,18 @@ export function changeAccountStatus(accounts, accountId, status, options = {}) {
   return { accounts: updateAccountStatus(accounts, accountId, status) };
 }
 
-export default function UsersPermissionsPage({ role, lifecycleState, peopleRecords = mockData.people, projectPeople = mockData.projectPeople, onOperationLog }) {
+export default function UsersPermissionsPage({ role, lifecycleState, peopleRecords = mockData.people, projectPeople = mockData.projectPeople, accounts: sharedAccounts, onAccountsChange, onOperationLog }) {
   const user = normalizeUser(role);
   const projects = scopedProjects(role, lifecycleState);
   const [projectId, setProjectId] = useState('all');
   const [detail, setDetail] = useState(null);
   const [accountDrawerOpen, setAccountDrawerOpen] = useState(false);
-  const [accounts, setAccounts] = useState(() => mockData.accounts.map((account) => ({ ...account })));
+  const [localAccounts, setLocalAccounts] = useState(() => mockData.accounts.map((account) => ({ ...account })));
+  const accounts = sharedAccounts ?? localAccounts;
+  const updateAccounts = (next) => {
+    if (onAccountsChange) onAccountsChange(typeof next === 'function' ? next(accounts) : next);
+    else setLocalAccounts(typeof next === 'function' ? next : () => next);
+  };
   const [form] = Form.useForm();
   const canManageAccounts = canOperate(user, 'accountOpen');
   const visibleAccounts = useMemo(() => accounts.filter((account) => (
@@ -74,7 +79,7 @@ export default function UsersPermissionsPage({ role, lifecycleState, peopleRecor
   const saveAccount = (values) => {
     const result = createAccount(values, accounts, { peopleRecords, projectPeople });
     if (result.error) return message.error(result.error);
-    setAccounts((current) => [...current, result.account]);
+    updateAccounts((current) => [...current, result.account]);
     writeLog({ projectId: result.account.projectIds[0], operatorId: user.accountId || 'account-admin', operation: 'accountOpen', targetId: result.account.accountId, reason: '开通账号' });
     setAccountDrawerOpen(false);
     form.resetFields();
@@ -83,12 +88,12 @@ export default function UsersPermissionsPage({ role, lifecycleState, peopleRecor
   const handleAccountStatusChange = (account, status) => {
     const result = changeAccountStatus(accounts, account.accountId, status, { peopleRecords, projectPeople });
     if (result.error) return message.error(result.error);
-    setAccounts(result.accounts);
+    updateAccounts(result.accounts);
     writeLog({ projectId: account.projectIds?.[0], operatorId: user.accountId || 'account-admin', operation: status === 'active' ? 'accountOpen' : 'accountDisable', targetId: account.accountId, reason: status === 'active' ? '开通账号' : '停用账号' });
     message.success(status === 'active' ? '账号已开通（本地演示）' : '账号已停用（本地演示）');
   };
   const resetCredentials = (account) => {
-    setAccounts((current) => resetAccountCredentials(current, account.accountId));
+    updateAccounts((current) => resetAccountCredentials(current, account.accountId));
     writeLog({ projectId: account.projectIds?.[0], operatorId: user.accountId || 'account-admin', operation: 'accountReset', targetId: account.accountId, reason: '重置登录凭据' });
     message.success('登录凭据已重置（本地演示）');
   };

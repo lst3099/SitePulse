@@ -7,8 +7,8 @@ import { filterByDataScope } from '../domain/permissions';
 import mockData from '../data/mockData';
 import { normalizeUser, projectName, scopedProjects } from './pageUtils';
 
-const MODULE_LABELS = { attendance: '考勤', devices: '设备', permissions: '授权', health: '健康与年龄', alerts: '告警', users: '用户与权限', projects: '项目', people: '人员' };
-const OPERATION_LABELS = { supplement: '补录', supplementVoid: '补录作废', edit: '编辑', bind: '绑定', deviceUnbind: '设备解绑', deviceMove: '设备换项目', deviceDisable: '设备停用', deviceArchive: '设备归档', deviceRegister: '设备登记', sync: '同步', authorize: '授权', alertRead: '告警已读', leave: '请假', accountOpen: '账号开通', accountDisable: '账号停用', accountReset: '账号重置', specialAuthorizationCreate: '特殊授权新增', specialAuthorizationUpdate: '特殊授权修改', specialAuthorizationRevoke: '特殊授权撤销', projectCreate: '项目新增', projectEdit: '项目编辑', projectStatus: '项目状态变更', personEdit: '人员编辑' };
+const MODULE_LABELS = { attendance: '考勤', devices: '设备', permissions: '授权', health: '健康与年龄', alerts: '告警', users: '用户与权限', projects: '项目', people: '人员', tools: '工具管理' };
+const OPERATION_LABELS = { supplement: '补录', supplementVoid: '补录作废', edit: '编辑', bind: '绑定', deviceUnbind: '设备解绑', deviceMove: '设备换项目', deviceDisable: '设备停用', deviceArchive: '设备归档', deviceRegister: '设备登记', sync: '同步', authorize: '授权', alertRead: '告警已读', leave: '请假', accountOpen: '账号开通', accountDisable: '账号停用', accountReset: '账号重置', accountBind: '绑定施工人员账号', accountUnbind: '解除施工人员账号关联', specialAuthorizationCreate: '特殊授权新增', specialAuthorizationUpdate: '特殊授权修改', specialAuthorizationRevoke: '特殊授权撤销', projectCreate: '项目新增', projectEdit: '项目编辑', projectStatus: '项目状态变更', personEdit: '人员编辑' };
 
 export default function OperationLogsPage({ role, lifecycleState, projectsRecords = mockData.projects, operationLogs = mockData.operationLogs }) {
   const projects = scopedProjects(role, lifecycleState, projectsRecords);

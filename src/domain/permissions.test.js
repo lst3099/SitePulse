@@ -47,6 +47,13 @@ describe('permission rules', () => {
     expect(canOperate(worker, 'export', { projectId: 'project-a' })).toBe(false);
   });
 
+  it('allows only system admins to bind or unbind worker accounts', () => {
+    expect(canOperate(admin, 'accountBind')).toBe(true);
+    expect(canOperate(admin, 'accountUnbind')).toBe(true);
+    expect(canOperate(owner, 'accountBind', { projectId: 'project-a' })).toBe(false);
+    expect(canOperate(worker, 'accountUnbind', { projectId: 'project-a' })).toBe(false);
+  });
+
   it('allows person editing for admins and in-scope project owners but never workers', () => {
     expect(canOperate(admin, 'editPerson', { projectId: 'project-b' })).toBe(true);
     expect(canOperate(owner, 'editPerson', { projectId: 'project-a' })).toBe(true);
@@ -74,6 +81,15 @@ describe('permission rules', () => {
     expect(canOperate(owner, 'replaceFace', { projectId: 'project-a' })).toBe(true);
     expect(canOperate(admin, 'remoteUnlock', { projectId: 'project-a' })).toBe(false);
     expect(canOperate(owner, 'remoteUnlock', { projectId: 'project-a' })).toBe(false);
+  });
+
+  it('scopes tool editing and inspection to admins and project owners', () => {
+    expect(canOperate(admin, 'editTool', { projectId: 'project-b' })).toBe(true);
+    expect(canOperate(owner, 'editTool', { projectId: 'project-a' })).toBe(true);
+    expect(canOperate(owner, 'editTool', { projectId: 'project-b' })).toBe(false);
+    expect(canOperate(owner, 'inspectTool', { projectId: 'project-a' })).toBe(true);
+    expect(canOperate(worker, 'inspectTool', { projectId: 'project-a' })).toBe(false);
+    expect(canOperate(admin, 'manageToolPolicy')).toBe(true);
   });
 
   it('does not revoke device access merely because the worker is on approved leave', () => {

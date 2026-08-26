@@ -241,7 +241,7 @@ export function getSpecialAuthorizationStatus(authorization, asOfDate = DEMO_AS_
   return 'expired';
 }
 
-export function makePersonRows(role, lifecycleState, authorizations = mockData.specialAuthorizations, projectPeople = mockData.projectPeople, registeredDevices = [], peopleRecords = mockData.people, projectsRecords = mockData.projects) {
+export function makePersonRows(role, lifecycleState, authorizations = mockData.specialAuthorizations, projectPeople = mockData.projectPeople, registeredDevices = [], peopleRecords = mockData.people, projectsRecords = mockData.projects, accounts = mockData.accounts) {
   const user = normalizeUser(role);
   const projects = scopedProjects(role, lifecycleState, projectsRecords);
   const records = peopleRecords.map((person) => {
@@ -276,6 +276,7 @@ export function makePersonRows(role, lifecycleState, authorizations = mockData.s
       };
     });
     const primaryRelationship = visibleRelations[0];
+    const account = accounts.find((item) => item.personId === person.id);
     const ageAccessState = primaryRelationship ? { age: primaryRelationship.age, status: primaryRelationship.ageAccessState, allowed: primaryRelationship.ageAccessAllowed, reason: primaryRelationship.ageAccessReason } : getAgeAccessState({ birthDate: person.birthDate, asOfDate: DEMO_AS_OF_DATE });
     return {
       ...person,
@@ -287,7 +288,11 @@ export function makePersonRows(role, lifecycleState, authorizations = mockData.s
       phone: person.id === 'person-1' ? '13800000000' : person.id === 'person-2' ? '13900000000' : '13700000000',
       team: person.id === 'person-3' ? '钢筋一队' : '土建一队',
       profession: person.id === 'person-2' ? '电工' : '钢筋工',
-      account: person.id === 'person-1' ? '施工人员张伟' : '未开通',
+      accountId: account?.accountId,
+      accountName: account?.name,
+      accountBindingState: account ? account.status === 'inactive' ? 'inactive' : 'bound' : 'unbound',
+      accountStatus: account?.status,
+      account: account?.name || '未开通',
       face: person.registered ? '已登记' : '未登记',
       healthReportStatus: person.healthReportStatus || 'missing',
       health: healthLabel(person.healthReportStatus),
@@ -299,7 +304,9 @@ export function makePersonRows(role, lifecycleState, authorizations = mockData.s
     };
   });
 
-  return user.role === 'worker' ? records.filter((person) => person.id === user.personId) : records.filter((person) => person.projectCount > 0);
+  if (user.role === 'worker') return records.filter((person) => person.id === user.personId);
+  if (user.role === 'projectOwner') return records.filter((person) => person.projectCount > 0);
+  return records;
 }
 
 export function getEntranceOptions(entrances, projectId) {
@@ -311,7 +318,7 @@ export function buildDeviceOperationLog(deviceId, values = {}, operatorId = 'acc
     : values.lifecycleStatus === 'stopped' ? 'deviceDisable'
       : values.projectId === undefined && values.bindingStatus === '已解除' ? 'deviceUnbind'
         : values.previousProjectId && values.previousProjectId !== values.projectId ? 'deviceMove'
-          : values.syncStatus ? 'sync' : values.bindingStatus === '已绑定' ? 'bind' : 'edit';
+          : ['已绑定', '待同步'].includes(values.bindingStatus) ? 'bind' : values.syncStatus ? 'sync' : 'edit';
   return {
     projectId: values.projectId,
     operatorId,
@@ -367,6 +374,23 @@ export function unbindDevice(device, action = 'unbind') {
 export function bindDeviceToProject(device, values = {}) {
   const next = { ...device, ...values, projectId: values.projectId || device.projectId, entranceId: values.entranceId, bindingStatus: '已绑定', accessStatus: 'allowed', personnelPermission: 'allowed', facePermission: 'allowed', disabled: false, archived: false, effectiveFrom: values.effectiveFrom || DEMO_AS_OF_DATE, bindingHistory: device.bindingHistory || [] };
   return { ...next, entranceName: values.entranceName || next.entranceName || '已绑定出入口' };
+}
+
+export function beginDeviceBindingSync(device, values = {}) {
+  return {
+    ...bindDeviceToProject(device, values),
+    bindingStatus: '待同步',
+    personnelSync: 'syncing',
+    faceSync: 'syncing',
+    permissionSync: 'syncing',
+    syncStatus: 'syncing',
+    platformPermission: 'allow',
+    devicePermission: 'deny',
+    effectivePermission: false,
+    accessStatus: 'revoked',
+    personnelPermission: 'revoked',
+    facePermission: 'revoked',
+  };
 }
 
 export function moveDeviceBinding(device, values = {}) {

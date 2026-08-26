@@ -19,6 +19,8 @@ const OWNER_OPERATIONS = new Set([
   'supplement',
   'specialAuthorization',
   'export',
+  'editTool',
+  'inspectTool',
 ]);
 
 const SUPPORTED_OPERATIONS = new Set([
@@ -26,6 +28,9 @@ const SUPPORTED_OPERATIONS = new Set([
   'accountOpen',
   'accountDisable',
   'accountReset',
+  'accountBind',
+  'accountUnbind',
+  'manageToolPolicy',
 ]);
 
 function roleOf(user) {

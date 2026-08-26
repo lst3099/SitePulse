@@ -30,10 +30,12 @@ describe('PC business pages', () => {
     expect(markup).toContain('工作台');
     expect(markup).toContain('项目管理');
     expect(markup).toContain('项目概况');
-    expect(markup).toContain('人员管理');
+    expect(markup).toContain('人员档案');
     expect(markup).toContain('设备与门禁');
+    expect(markup).toContain('登记设备');
     expect(markup).toContain('健康报告与年龄限制');
-    expect(markup).toContain('工器具');
+    expect(markup).toContain('工具管理');
+    expect(markup).toContain('工具编号');
     expect(markup).toContain('基础资料');
   });
 });
