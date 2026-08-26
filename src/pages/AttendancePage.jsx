@@ -20,6 +20,10 @@ function displayDateTime(value) {
   return value ? String(value).replace('T', ' ').replace(/\+08:00$/, '') : '—';
 }
 
+export function getAccessRecordFilters(row) {
+  return { projectId: row.projectId, personId: row.personId, date: row.date };
+}
+
 export function getCaptureForEvent(event, captures = mockData.captures) {
   return captures.find((capture) => capture.eventId === event?.id);
 }
@@ -118,7 +122,7 @@ export function buildAttendanceRows({
     }));
 }
 
-export default function AttendancePage({ role, lifecycleState, projectsRecords = mockData.projects, peopleRecords = mockData.people, projectPeople = mockData.projectPeople, rawEvents = mockData.rawEvents, fixedProjectId, embedded = false, supplements: sharedSupplements, onSupplementsChange, leaveRecords: sharedLeaves, onLeaveRecordsChange, onOperationLog }) {
+export default function AttendancePage({ role, lifecycleState, projectsRecords = mockData.projects, peopleRecords = mockData.people, projectPeople = mockData.projectPeople, rawEvents = mockData.rawEvents, fixedProjectId, embedded = false, supplements: sharedSupplements, onSupplementsChange, leaveRecords: sharedLeaves, onLeaveRecordsChange, onOperationLog, onOpenAccessRecords }) {
   const user = normalizeUser(role);
   const projects = scopedProjects(role, lifecycleState, projectsRecords);
   const [filters, setFilters] = useState({ projectId: fixedProjectId || 'all', personId: 'all', date: DEFAULT_DATE });
@@ -241,22 +245,22 @@ export default function AttendancePage({ role, lifecycleState, projectsRecords =
     { title: '平台考勤结果', key: 'status', render: (_, row) => <StatusTag status={row.status === '正常' ? 'success' : row.status === '缺勤' ? 'error' : 'warning'} label={row.status} /> },
     { title: '来源 / 补录状态', key: 'source', render: (_, row) => <div>{row.sourceLabel}<div className="muted-text">{row.supplementStatus}</div></div> },
     { title: '设备 / 平台权限解释', key: 'permission', render: (_, row) => row.permissionMarkers.length ? row.permissionMarkers.map((marker) => marker.expiredPermission ? '权限过期设备放行' : '权限不一致').join('、') : '—' },
-    { title: '最早进门', dataIndex: 'firstEntryAt', key: 'firstEntryAt', render: displayDateTime },
-    { title: '最晚出门', dataIndex: 'lastExitAt', key: 'lastExitAt', render: displayDateTime },
+    { title: '最早打卡', dataIndex: 'firstPunchAt', key: 'firstPunchAt', render: displayDateTime },
+    { title: '最晚打卡', dataIndex: 'lastPunchAt', key: 'lastPunchAt', render: displayDateTime },
     { title: '迟到 / 早退', key: 'flags', render: (_, row) => <Space>{row.isLate && <StatusTag status="warning" label="迟到" />}{row.isEarlyLeave && <StatusTag status="warning" label="早退" />}{!row.isLate && !row.isEarlyLeave && '—'}</Space> },
-    { title: '操作', key: 'action', render: (_, row) => { const activeSupplement = row.supplementRecords.find((record) => record.voided !== true && record.approved !== false); return <div className="table-actions"><Button type="link" onClick={() => setDetail({ type: row.leave ? 'leave' : 'attendance', data: row.leave || row })}>详情</Button>{activeSupplement && <Button type="link" onClick={() => setDetail({ type: 'supplement', data: activeSupplement })}>补录详情</Button>}{canSupplement && <Button type="link" onClick={() => { form.setFieldsValue({ projectId: row.projectId, personId: row.personId, date: row.date }); setSupplementOpen(true); }}>补录</Button>}</div>; } },
+    { title: '操作', key: 'action', render: (_, row) => { const activeSupplement = row.supplementRecords.find((record) => record.voided !== true && record.approved !== false); return <div className="table-actions"><Button type="link" onClick={() => onOpenAccessRecords?.(getAccessRecordFilters(row))}>详情</Button>{activeSupplement && <Button type="link" onClick={() => setDetail({ type: 'supplement', data: activeSupplement })}>补录详情</Button>}{canSupplement && <Button type="link" onClick={() => { form.setFieldsValue({ projectId: row.projectId, personId: row.personId, date: row.date }); setSupplementOpen(true); }}>补录</Button>}</div>; } },
   ];
 
   return <div className={embedded ? 'attendance-panel' : 'business-page'}>
-    {!embedded && <PageHeader title="考勤管理" description="按项目、人员、日期查看不可修改的设备原始事件与平台汇总结果。" breadcrumb={['首页', '考勤管理']} extra={<Space>{canLeave && <Button onClick={() => setLeaveOpen(true)}>登记请假</Button>}{canSupplement && <Button type="primary" icon={<PlusOutlined />} onClick={() => setSupplementOpen(true)}>新增补录</Button>}</Space>} />}
-    {!embedded && <div className="workday-note"><StatusTag status="normal" label="规则边界" /> 原始设备事件不可修改、不可合并；同一设备事件已去重。只有“补录”，补录只新增平台结果，不改变原始事件；不实现加班、APP补录、远程开门。</div>}
+     {!embedded && <PageHeader title="考勤管理" description="按项目、人员、日期查看平台考勤结果；门禁设备、出入口和开门结果请进入门禁记录。" breadcrumb={['首页', '考勤管理']} extra={<Space>{canLeave && <Button onClick={() => setLeaveOpen(true)}>登记请假</Button>}{canSupplement && <Button type="primary" icon={<PlusOutlined />} onClick={() => setSupplementOpen(true)}>新增补录</Button>}</Space>} />}
+     {!embedded && <div className="workday-note"><StatusTag status="normal" label="规则边界" /> 考勤按当天最早、最晚有效打卡时间判断迟到和早退；门禁原始事件不可修改、不可合并，同一设备事件仅在展示时去重。补录只新增平台结果，不改变原始事件；不实现加班、APP补录、远程开门。</div>}
     <FilterBar onReset={() => { setFilters({ projectId: 'all', personId: 'all', date: DEFAULT_DATE }); setAppliedFilters({ projectId: 'all', personId: 'all', date: DEFAULT_DATE }); }} onSearch={() => setAppliedFilters(filters)}>
       {!fixedProjectId && <Select aria-label="项目筛选" value={filters.projectId} onChange={(projectId) => setFilters({ ...filters, projectId, personId: 'all' })} options={projectOptions} />}
       <Input aria-label="日期筛选" type="date" value={filters.date} onChange={(event) => setFilters({ ...filters, date: event.target.value })} />
       <Select aria-label="人员筛选" value={filters.personId} onChange={(personId) => setFilters({ ...filters, personId })} options={personSelectOptions} />
     </FilterBar>
     {!embedded && <Card title="设备原始事件" className="table-card" extra={<Typography.Text type="secondary">共 {rawRows.length} 条去重事件</Typography.Text>}><Table rowKey="id" columns={rawColumns} dataSource={rawRows} scroll={{ x: 1200 }} pagination={false} /></Card>}
-    <Card title="平台考勤结果" className="table-card" extra={<Typography.Text type="secondary">按项目 + 人员 + 日期汇总有效进出</Typography.Text>}><Table rowKey={(row) => `${row.projectId}-${row.personId}-${row.date}`} columns={resultColumns} dataSource={rows} scroll={{ x: 1200 }} pagination={false} /></Card>
+     <Card title="平台考勤结果" className="table-card" extra={<Typography.Text type="secondary">按项目 + 人员 + 日期汇总有效打卡</Typography.Text>}><Table rowKey={(row) => `${row.projectId}-${row.personId}-${row.date}`} columns={resultColumns} dataSource={rows} scroll={{ x: 1200 }} pagination={false} /></Card>
     <DetailDrawer open={Boolean(detail)} onClose={() => setDetail(null)} type={detail?.type} data={detail?.data} role={role} onSubmit={detail?.type === 'supplement' ? ({ voidReason }) => voidSupplement(detail.data.id, voidReason) : undefined} />
     <Drawer title="新增平台补录" open={supplementOpen} onClose={() => { setSupplementOpen(false); form.resetFields(); }} width={480} destroyOnClose>
       <Typography.Paragraph type="secondary">补录只进入平台考勤结果，设备原始事件保持只读。</Typography.Paragraph>

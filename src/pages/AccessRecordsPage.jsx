@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Select, Space, Table, Typography } from 'antd';
 import { CameraOutlined } from '@ant-design/icons';
 import DetailDrawer from '../components/DetailDrawer';
@@ -22,6 +22,20 @@ function faceRecognitionLabel(value) {
 
 function directionLabel(value) {
   return value === 'in' ? '进门' : value === 'out' ? '出门' : '未标记';
+}
+
+export function doorOpenedLabel(value) {
+  return value === true ? '已开门' : value === false ? '未开门' : '未标记';
+}
+
+function normalizeFilters(initialFilters = {}) {
+  const provided = initialFilters || {};
+  return {
+    deviceId: provided.deviceId || 'all',
+    projectId: provided.projectId || 'all',
+    personId: provided.personId || 'all',
+    date: provided.date || DEFAULT_DATE,
+  };
 }
 
 function permissionLabel(event) {
@@ -60,6 +74,7 @@ export function buildAccessRecordRows({
   captures = mockData.captures,
   deviceId,
   projectId,
+  personId,
   date,
 } = {}) {
   const user = normalizeUser(role);
@@ -73,6 +88,7 @@ export function buildAccessRecordRows({
     .filter((event) => !event.projectId || projectMap.has(event.projectId))
     .filter((event) => !deviceId || event.deviceId === deviceId)
     .filter((event) => !projectId || event.projectId === projectId)
+    .filter((event) => !personId || event.personId === personId)
     .filter((event) => !date || String(event.eventTime || '').slice(0, 10) === date)
     .map((event) => {
       const classified = classifyRawEvent(event);
@@ -95,16 +111,22 @@ export function buildAccessRecordRows({
     });
 }
 
-export default function AccessRecordsPage({ role, lifecycleState, rawEvents = mockData.rawEvents, projectsRecords = mockData.projects, peopleRecords = mockData.people, devices = mockData.devices, registeredDevices = [], entrances = mockData.entrances, captures = mockData.captures }) {
+export default function AccessRecordsPage({ role, lifecycleState, rawEvents = mockData.rawEvents, projectsRecords = mockData.projects, peopleRecords = mockData.people, devices = mockData.devices, registeredDevices = [], entrances = mockData.entrances, captures = mockData.captures, initialFilters }) {
   const user = normalizeUser(role);
   const projects = scopedProjects(role, lifecycleState, projectsRecords);
-  const [filters, setFilters] = useState({ deviceId: 'all', projectId: 'all', date: DEFAULT_DATE });
-  const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [filters, setFilters] = useState(() => normalizeFilters(initialFilters));
+  const [appliedFilters, setAppliedFilters] = useState(() => normalizeFilters(initialFilters));
   const [detail, setDetail] = useState(null);
+  useEffect(() => {
+    const next = normalizeFilters(initialFilters);
+    setFilters(next);
+    setAppliedFilters(next);
+  }, [initialFilters?.date, initialFilters?.deviceId, initialFilters?.personId, initialFilters?.projectId]);
   const allRows = useMemo(() => buildAccessRecordRows({ role, lifecycleState, rawEvents, projectsRecords, peopleRecords, devices, registeredDevices, entrances, captures }), [captures, devices, entrances, lifecycleState, peopleRecords, projectsRecords, rawEvents, registeredDevices, role]);
-  const rows = useMemo(() => buildAccessRecordRows({ role, lifecycleState, rawEvents, projectsRecords, peopleRecords, devices, registeredDevices, entrances, captures, deviceId: appliedFilters.deviceId === 'all' ? undefined : appliedFilters.deviceId, projectId: appliedFilters.projectId === 'all' ? undefined : appliedFilters.projectId, date: appliedFilters.date }), [appliedFilters, captures, devices, entrances, lifecycleState, peopleRecords, projectsRecords, rawEvents, registeredDevices, role]);
+  const rows = useMemo(() => buildAccessRecordRows({ role, lifecycleState, rawEvents, projectsRecords, peopleRecords, devices, registeredDevices, entrances, captures, deviceId: appliedFilters.deviceId === 'all' ? undefined : appliedFilters.deviceId, projectId: appliedFilters.projectId === 'all' ? undefined : appliedFilters.projectId, personId: appliedFilters.personId === 'all' ? undefined : appliedFilters.personId, date: appliedFilters.date }), [appliedFilters, captures, devices, entrances, lifecycleState, peopleRecords, projectsRecords, rawEvents, registeredDevices, role]);
   const deviceOptions = [{ value: 'all', label: '全部门禁设备' }, ...Array.from(new Map(allRows.map((row) => [row.deviceId, row.deviceName])).entries()).map(([value, label]) => ({ value, label }))];
   const projectOptions = [{ value: 'all', label: '全部项目' }, ...projects.map((project) => ({ value: project.id, label: project.name }))];
+  const personOptions = [{ value: 'all', label: '全部人员' }, ...Array.from(new Map(allRows.filter((row) => row.personId).map((row) => [row.personId, row.personName])).entries()).map(([value, label]) => ({ value, label }))];
   const columns = [
     { title: '门禁设备', key: 'device', render: (_, record) => <div><strong>{record.deviceName}</strong><div className="muted-text">{record.deviceModel} · {record.deviceId || '—'}</div></div> },
     { title: '项目 / 出入口', key: 'project', render: (_, record) => <div>{record.projectName}<div className="muted-text">{record.entranceName}</div></div> },
@@ -112,6 +134,7 @@ export default function AccessRecordsPage({ role, lifecycleState, rawEvents = mo
     { title: '人员', dataIndex: 'personName', key: 'personName' },
     { title: '刷脸结果', dataIndex: 'faceRecognitionLabel', key: 'faceRecognition' },
     { title: '进出方向', dataIndex: 'directionLabel', key: 'direction' },
+    { title: '是否开门', key: 'doorOpened', render: (_, record) => doorOpenedLabel(record.doorOpened) },
     { title: '设备侧放行', dataIndex: 'permissionLabel', key: 'permission' },
     { title: '来源 / 事件序列', key: 'source', render: (_, record) => `${record.source || '—'} / ${record.eventSerial || '—'}` },
     { title: '事件结论', key: 'result', render: (_, record) => <StatusTag status={record.isEffective ? 'success' : record.securityLog ? 'error' : 'warning'} label={record.isEffective ? '有效进出' : record.securityLog ? '安全日志' : '无效事件'} /> },
@@ -121,9 +144,10 @@ export default function AccessRecordsPage({ role, lifecycleState, rawEvents = mo
   return <div className="business-page">
     <PageHeader title="门禁记录" description="按门禁设备查看系统原始刷脸事件，原始数据只读保存。" breadcrumb={['首页', '门禁记录']} />
     <div className="workday-note"><StatusTag status="normal" label="原始事件" /> 门禁记录直接来自设备上报；重复事件只在展示时按设备事件身份去重，不改变原始事件内容。</div>
-    <FilterBar onReset={() => { setFilters({ deviceId: 'all', projectId: 'all', date: DEFAULT_DATE }); setAppliedFilters({ deviceId: 'all', projectId: 'all', date: DEFAULT_DATE }); }} onSearch={() => setAppliedFilters(filters)}>
+    <FilterBar onReset={() => { const next = normalizeFilters(); setFilters(next); setAppliedFilters(next); }} onSearch={() => setAppliedFilters(filters)}>
       <Select aria-label="设备筛选" value={filters.deviceId} onChange={(deviceId) => setFilters({ ...filters, deviceId })} options={deviceOptions} />
       <Select aria-label="项目筛选" value={filters.projectId} onChange={(projectId) => setFilters({ ...filters, projectId })} options={projectOptions} />
+      <Select aria-label="人员筛选" value={filters.personId} onChange={(personId) => setFilters({ ...filters, personId })} options={personOptions} />
       <input aria-label="日期筛选" type="date" value={filters.date} onChange={(event) => setFilters({ ...filters, date: event.target.value })} />
     </FilterBar>
     <Card title="门禁刷脸记录" className="table-card" extra={<Typography.Text type="secondary">共 {rows.length} 条去重事件</Typography.Text>}><Table rowKey="id" columns={columns} dataSource={rows} scroll={{ x: 1500 }} pagination={false} /></Card>

@@ -1,10 +1,11 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import App from './App';
+import App, { createAccessRecordNavigation } from './App';
 import AppShell, { getShellMenu } from './components/AppShell';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import { buildAccessRecordRows } from './pages/AccessRecordsPage';
+import { getAccessRecordFilters } from './pages/AttendancePage';
 import mockData from './data/mockData';
 
 const admin = { role: 'systemAdmin', accountId: 'account-admin' };
@@ -65,6 +66,43 @@ describe('门禁记录与项目考勤结果拆分', () => {
 
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((row) => row.deviceId === 'device-a-in' && row.projectId === 'project-a' && row.eventTime.startsWith('2026-08-25'))).toBe(true);
+  });
+
+  it('builds access-record filters from an attendance result and keeps gate data there', () => {
+    const row = { projectId: 'project-a', personId: 'person-1', date: '2026-08-25' };
+    expect(getAccessRecordFilters(row)).toEqual(row);
+
+    const rows = buildAccessRecordRows({
+      role: admin,
+      rawEvents: mockData.rawEvents,
+      projectsRecords: mockData.projects,
+      peopleRecords: mockData.people,
+      devices: mockData.devices,
+      projectId: 'project-a',
+      personId: 'person-1',
+      date: '2026-08-25',
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((event) => event.projectId === 'project-a' && event.personId === 'person-1')).toBe(true);
+    expect(rows.some((event) => event.doorOpened === true)).toBe(true);
+  });
+
+  it('labels the attendance table with punch times instead of gate directions', () => {
+    const markup = renderToStaticMarkup(
+      <ProjectDetailPage role={admin} selectedProjectId="project-a" projectsRecords={mockData.projects} peopleRecords={mockData.people} projectPeople={mockData.projectPeople} leaveRecords={[]} supplements={[]} rawEvents={mockData.rawEvents} />,
+    );
+
+    expect(markup).toContain('最早打卡');
+    expect(markup).toContain('最晚打卡');
+    expect(markup).not.toContain('最早进门');
+    expect(markup).not.toContain('最晚出门');
+  });
+
+  it('creates a scoped access-record navigation request', () => {
+    expect(createAccessRecordNavigation({ projectId: 'project-a', personId: 'person-1', date: '2026-08-25' })).toEqual({
+      view: 'accessRecords',
+      filters: { projectId: 'project-a', personId: 'person-1', date: '2026-08-25' },
+    });
   });
 
   it('exposes door access as a sidebar page instead of standalone attendance management', () => {

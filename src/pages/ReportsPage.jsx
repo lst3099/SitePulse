@@ -55,7 +55,7 @@ export default function ReportsPage({ role, lifecycleState, projectsRecords = mo
   const fields = filters.type === 'people'
     ? [{ label: '姓名', value: (row) => row.name }, { label: '身份证（脱敏）', value: (row) => row.idCardNumber ? `${String(row.idCardNumber).slice(0, 3)}********` : '—' }, { label: '项目', value: (row) => row.projectRelationships.map((item) => item.projectName).join('、') }, { label: '账号', value: (row) => row.account }, { label: '健康', value: (row) => row.health }]
     : filters.type === 'attendance'
-      ? [{ label: '项目', value: (row) => row.projectName }, { label: '人员', value: (row) => row.personName }, { label: '日期', value: (row) => row.date }, { label: '平台考勤结果', value: (row) => row.status }, { label: '最早进门', value: (row) => row.firstEntryAt || '—' }, { label: '最晚出门', value: (row) => row.lastExitAt || '—' }]
+      ? [{ label: '项目', value: (row) => row.projectName }, { label: '人员', value: (row) => row.personName }, { label: '日期', value: (row) => row.date }, { label: '平台考勤结果', value: (row) => row.status }, { label: '最早打卡', value: (row) => row.firstPunchAt || row.firstEntryAt || '—' }, { label: '最晚打卡', value: (row) => row.lastPunchAt || row.lastExitAt || '—' }]
       : [{ label: '项目', value: (row) => row.projectName }, { label: '人员', value: (row) => row.personName }, { label: '事件时间', value: (row) => row.eventTime }, { label: '方向', value: (row) => row.direction === 'in' ? '进门' : '出门' }, { label: '设备', value: (row) => row.deviceId }, { label: '事件序列', value: (row) => row.eventSerial }];
   const exportReport = () => {
     const csv = toCsv(rows, fields);
