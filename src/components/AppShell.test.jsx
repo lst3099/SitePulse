@@ -105,6 +105,51 @@ describe('PC shell and shared components', () => {
     expect(supplement).toContain('作废原因');
   });
 
+  it('hides project relationship fields from add and edit forms while keeping them in view mode', () => {
+    const edit = render(
+      <PersonDrawerContent
+        mode="edit"
+        role={{ role: 'systemAdmin' }}
+        person={{
+          id: 'person-1',
+          projectId: 'project-a',
+          relationStatus: 'active',
+          status: '在场',
+          projectOptions: [{ value: 'project-a', label: '项目 A' }],
+        }}
+        onSubmit={() => {}}
+      />,
+    );
+    const add = render(
+      <PersonDrawerContent
+        mode="edit"
+        role={{ role: 'systemAdmin' }}
+        person={{ registered: false, projectOptions: [{ value: 'project-a', label: '项目 A' }] }}
+        onSubmit={() => {}}
+      />,
+    );
+    const view = render(
+      <PersonDrawerContent
+        mode="view"
+        role={{ role: 'systemAdmin' }}
+        person={{
+          projectId: 'project-a',
+          relationStatus: 'active',
+          status: '在场',
+          projectOptions: [{ value: 'project-a', label: '项目 A' }],
+        }}
+      />,
+    );
+
+    for (const markup of [edit, add]) {
+      expect(markup).not.toContain('项目关系');
+      expect(markup).not.toContain('所属项目');
+      expect(markup).not.toContain('关系类型');
+      expect(markup).not.toContain('人员状态');
+    }
+    expect(view).toContain('项目关系');
+  });
+
   it('only renders the person save action for admin and in-scope project owner', () => {
     const person = { projectId: 'project-a', personId: 'person-1', name: '张伟', phone: '13800000000' };
     const admin = render(<PersonDrawerContent mode="edit" role={{ role: 'systemAdmin' }} person={person} onSubmit={() => {}} />);
@@ -132,6 +177,9 @@ describe('PC shell and shared components', () => {
     expect(submitPersonEdit(owner, { projectId: 'project-b' }, () => { submitted = true; })).toBe(false);
     expect(submitted).toBe(false);
     expect(submitPersonEdit(owner, { projectId: 'project-a' }, () => { submitted = true; })).toBe(true);
+    expect(submitted).toBe(true);
+    submitted = false;
+    expect(submitPersonEdit(owner, {}, () => { submitted = true; }, 'project-a')).toBe(true);
     expect(submitted).toBe(true);
   });
 

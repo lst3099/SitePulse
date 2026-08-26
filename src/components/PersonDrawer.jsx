@@ -10,8 +10,9 @@ export function getEditableProjectOptions(user, projectOptions = []) {
   return projectOptions.filter((option) => canOperate(user, 'editPerson', { projectId: option.value }));
 }
 
-export function submitPersonEdit(user, values, onSubmit) {
-  if (!canOperate(user, 'editPerson', { projectId: values?.projectId })) return false;
+export function submitPersonEdit(user, values, onSubmit, scopeProjectId) {
+  const projectId = scopeProjectId || values?.projectId;
+  if (!canOperate(user, 'editPerson', { projectId })) return false;
   if (typeof onSubmit !== 'function') return false;
   onSubmit(values);
   return true;
@@ -59,26 +60,33 @@ export function PersonDrawerContent({
   const uniqueRecords = people.length ? people : peopleRecords;
   const disabled = mode === 'view' || !canEdit || typeof onSubmit !== 'function';
   const hasExistingFace = person.registered === true || hasUpload(person.faceImage);
+  const editFormPerson = mode === 'edit'
+    ? (({ projectId, relationStatus, status, projectOptions, projectIds, projectCount, projectRelationships, ...values }) => values)(person)
+    : person;
   const initialValues = {
-    ...person,
-    relationStatus: person.relationStatus || person.projectRelationships?.[0]?.status || 'active',
+    ...editFormPerson,
+    ...(mode === 'view' ? { relationStatus: person.relationStatus || person.projectRelationships?.[0]?.status || 'active' } : {}),
     faceImage: normalizeFileList(person.faceImage || (person.registered ? '已登记人脸照片' : ''), '已登记人脸照片'),
     healthReport: normalizeFileList(person.healthReport, '健康报告'),
     qualifications: normalizeFileList(person.qualifications || person.qualification, '资质证书'),
   };
 
   return (
-      <Form layout="vertical" disabled={disabled} onFinish={(values) => submitPersonEdit(user, values, onSubmit)} initialValues={initialValues}>
+      <Form layout="vertical" disabled={disabled} onFinish={(values) => submitPersonEdit(user, values, onSubmit, scopeProjectId)} initialValues={initialValues}>
         <Typography.Title level={5}>基础资料</Typography.Title>
         {canView('name') && <Form.Item label="姓名" name="name" rules={[{ required: true, whitespace: true, message: '请输入姓名' }]}><Input /></Form.Item>}
         {canView('idCardNumber') && <Form.Item label="身份证号" name="idCardNumber" rules={[{ required: true, whitespace: true, message: '请输入身份证号' }, getUniqueFieldRule('idCardNumber', '身份证号', uniqueRecords, person.id)]}><Input readOnly={mode === 'view'} /></Form.Item>}
         {canView('phone') && <Form.Item label="联系电话" name="phone" rules={[{ required: true, whitespace: true, message: '请输入联系电话' }, getUniqueFieldRule('phone', '联系电话', uniqueRecords, person.id)]}><Input /></Form.Item>}
 
-        <Divider />
-        <Typography.Title level={5}>项目关系</Typography.Title>
-        {canView('projectId') && <Form.Item label="所属项目" name="projectId"><Select allowClear placeholder="暂不绑定项目" options={editableProjectOptions} /></Form.Item>}
-        {canView('status') && <Form.Item label="关系类型" name="relationStatus"><Select allowClear placeholder="暂不设置关系类型" options={[{ value: 'active', label: '主项目' }, { value: 'temporary', label: '临时项目' }]} /></Form.Item>}
-        {canView('status') && <Form.Item label="人员状态" name="status"><Input /></Form.Item>}
+        {mode === 'view' && (
+          <>
+            <Divider />
+            <Typography.Title level={5}>项目关系</Typography.Title>
+            {canView('projectId') && <Form.Item label="所属项目" name="projectId"><Select allowClear placeholder="暂不绑定项目" options={editableProjectOptions} /></Form.Item>}
+            {canView('status') && <Form.Item label="关系类型" name="relationStatus"><Select allowClear placeholder="暂不设置关系类型" options={[{ value: 'active', label: '主项目' }, { value: 'temporary', label: '临时项目' }]} /></Form.Item>}
+            {canView('status') && <Form.Item label="人员状态" name="status"><Input /></Form.Item>}
+          </>
+        )}
 
         <Divider />
         <Typography.Title level={5}>门禁资料</Typography.Title>
