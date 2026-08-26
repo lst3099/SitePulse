@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowLeftOutlined, LinkOutlined } from '@ant-design/icons';
-import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, Select, Space, Table, Tabs, Tag, message } from 'antd';
+import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Select, Space, Table, Tabs, Tag, message } from 'antd';
 import DeviceBindingDrawer from '../components/DeviceBindingDrawer';
 import PageHeader from '../components/PageHeader';
 import StatusTag from '../components/StatusTag';
@@ -10,9 +10,9 @@ import { AUTH_STATUS_META, buildAuthorizationAuditLog, buildAuthorizationRecord,
 import mockData from '../data/mockData';
 import { canOperate } from '../domain/permissions';
 import { getVisibleAlerts } from './AlertsPage';
-import { DEMO_AS_OF_DATE, beginDeviceBindingSync, getProjectAttendanceRows, getSpecialAuthorizationStatus, makeDeviceRows, makePersonRows, normalizeUser, scopedProjects, statusLabel, toDatePickerValue, unbindDevice } from './pageUtils';
+import { DEMO_AS_OF_DATE, beginDeviceBindingSync, getProjectAgeConfig, getProjectAttendanceRows, getSpecialAuthorizationStatus, makeDeviceRows, makePersonRows, normalizeUser, scopedProjects, statusLabel, toDatePickerValue, unbindDevice } from './pageUtils';
 
-export default function ProjectDetailPage({ role, lifecycleState, projectsRecords = mockData.projects, peopleRecords = mockData.people, projectPeople = mockData.projectPeople, registeredDevices = [], selectedProjectId, authorizations, leaveRecords, supplements, rawEvents = mockData.rawEvents, alerts = mockData.alerts, toolsRecords = mockData.tools, inspectionsRecords = mockData.toolInspections, toolInspectionPolicy = mockData.toolInspectionPolicy, onToolsChange, onInspectionsChange, onPolicyChange, onAuthorizationsChange, onSupplementsChange, onLeaveRecordsChange, onOperationLog, onOpenMobileTool, onDeviceChange, onOpenAccessRecords, onBack, defaultTab = 'overview' }) {
+export default function ProjectDetailPage({ role, lifecycleState, projectsRecords = mockData.projects, peopleRecords = mockData.people, projectPeople = mockData.projectPeople, registeredDevices = [], selectedProjectId, authorizations, leaveRecords, supplements, rawEvents = mockData.rawEvents, alerts = mockData.alerts, toolsRecords = mockData.tools, inspectionsRecords = mockData.toolInspections, toolInspectionPolicy = mockData.toolInspectionPolicy, onToolsChange, onInspectionsChange, onPolicyChange, onAuthorizationsChange, onSupplementsChange, onLeaveRecordsChange, onOperationLog, onOpenMobileTool, onDeviceChange, onOpenAccessRecords, onProjectsRecordsChange, onBack, defaultTab = 'overview' }) {
   const user = normalizeUser(role);
   const projects = scopedProjects(role, lifecycleState, projectsRecords);
   const project = projects.find((item) => item.id === selectedProjectId) || projects[0] || projectsRecords[0];
@@ -23,6 +23,8 @@ export default function ProjectDetailPage({ role, lifecycleState, projectsRecord
   const [authorizationDrawerOpen, setAuthorizationDrawerOpen] = useState(false);
   const [authorizationForm] = Form.useForm();
   const [editingAuthorization, setEditingAuthorization] = useState(null);
+  const [ageRuleDrawerOpen, setAgeRuleDrawerOpen] = useState(false);
+  const [ageRuleForm] = Form.useForm();
   const devices = useMemo(() => makeDeviceRows(role, lifecycleState, currentAuthorizations, registeredDevices, projectPeople, peopleRecords, projectsRecords).filter((device) => device.projectId === project.id), [currentAuthorizations, lifecycleState, peopleRecords, project.id, projectPeople, projectsRecords, registeredDevices, role]);
   const allDeviceRows = useMemo(() => makeDeviceRows({ role: 'systemAdmin' }, lifecycleState, currentAuthorizations, registeredDevices, projectPeople, peopleRecords, projectsRecords), [currentAuthorizations, lifecycleState, peopleRecords, projectPeople, projectsRecords, registeredDevices]);
   const availableDevices = useMemo(() => allDeviceRows.filter((device) => device.registered && !device.projectId && !device.disabled && !device.archived), [allDeviceRows]);
@@ -35,6 +37,8 @@ export default function ProjectDetailPage({ role, lifecycleState, projectsRecord
   });
   const projectAuthorizations = currentAuthorizations.filter((authorization) => authorization.projectId === project.id);
   const canManageAuthorization = canOperate(user, 'specialAuthorization', { projectId: project.id });
+  const canManageProject = canOperate(user, 'editPerson', { projectId: project.id });
+  const ageConfig = getProjectAgeConfig(project);
   const canBind = project.status === 'active' && canOperate(role, 'bindDevice', { projectId: project.id, deviceRegistered: true });
   const openBinding = () => setBindingDevice({ projectId: project.id, registered: false, bindingMode: 'create' });
   const updateBinding = (values) => {
@@ -118,6 +122,30 @@ export default function ProjectDetailPage({ role, lifecycleState, projectsRecord
     onOperationLog?.(buildAuthorizationAuditLog({ ...authorization, revokeReason: '手工撤销' }, 'revoke', user.accountId || 'account-admin'));
     message.success('特殊授权已撤销（本地演示）');
   };
+  const openAgeRuleEditor = () => {
+    if (!canManageProject) {
+      message.error('当前角色无权修改项目年龄规则');
+      return;
+    }
+    ageRuleForm.setFieldsValue(ageConfig);
+    setAgeRuleDrawerOpen(true);
+  };
+  const saveAgeRule = (values) => {
+    if (!canManageProject) {
+      message.error('当前角色无权修改项目年龄规则');
+      return;
+    }
+    if (typeof onProjectsRecordsChange !== 'function') {
+      message.error('项目数据未接入，年龄规则未更新');
+      return;
+    }
+    const nextAgeConfig = getProjectAgeConfig(values);
+    const next = projectsRecords.map((item) => item.id === project.id ? { ...item, ...nextAgeConfig } : { ...item });
+    onProjectsRecordsChange(next);
+    setAgeRuleDrawerOpen(false);
+    ageRuleForm.resetFields();
+    message.success('项目年龄规则已更新（本地演示）');
+  };
   const personColumns = [
     { title: '姓名', dataIndex: 'name', key: 'name' },
     { title: '人员状态', dataIndex: 'status', key: 'status', render: (value) => <StatusTag status={value === 'active' ? 'success' : 'warning'} label={statusLabel(value)} /> },
@@ -152,7 +180,7 @@ export default function ProjectDetailPage({ role, lifecycleState, projectsRecord
       <Table rowKey="id" columns={deviceColumns} dataSource={devices} pagination={false} locale={{ emptyText: '暂无已绑定设备' }} />
     </Card>;
   const items = [
-    { key: 'overview', label: '项目概况', children: <Space direction="vertical" size="large" className="full-width"><Card><Descriptions column={{ xs: 1, sm: 2 }} bordered><Descriptions.Item label="项目名称">{project.name}</Descriptions.Item><Descriptions.Item label="项目地址">{project.address || '滨江区江南大道 88 号'}</Descriptions.Item><Descriptions.Item label="负责人">{project.owner || '项目负责人甲'}</Descriptions.Item><Descriptions.Item label="项目状态"><StatusTag status={project.status} label={statusLabel(project.status)} /></Descriptions.Item><Descriptions.Item label="考勤规则">{project.workStart} - {project.workEnd}，宽限 {project.graceMinutes} 分钟</Descriptions.Item><Descriptions.Item label="门禁配置">绑定设备时选择出入口</Descriptions.Item><Descriptions.Item label="历史数据" span={2}>保留原始事件与考勤结果，只读查看</Descriptions.Item></Descriptions></Card><Card title="设备同步摘要"><div className="summary-strip"><StatisticItem label="项目设备" value={devices.length} /><StatisticItem label="在线" value={devices.filter((device) => device.online).length} /><StatisticItem label="同步失败" value={devices.filter((device) => device.syncStatus === 'failed').length} /><StatisticItem label="告警" value={visibleAlerts.length} /></div></Card><Card title="考勤统计"><div className="summary-strip"><StatisticItem label="今日正常" value={attendanceRecords.filter((item) => item.status === '正常').length} /><StatisticItem label="迟到" value={attendanceRecords.filter((item) => item.isLate).length} /><StatisticItem label="早退" value={attendanceRecords.filter((item) => item.isEarlyLeave).length} /><StatisticItem label="缺勤" value={attendanceRecords.filter((item) => item.status === '缺勤').length} /><StatisticItem label="请假" value={attendanceRecords.filter((item) => item.status === '请假').length} /><StatisticItem label="无需考勤" value={attendanceRecords.filter((item) => item.status === '无需考勤').length} /></div><p className="muted-text">统计当前项目演示日期的考勤结果，明细请进入“考勤记录”。</p></Card></Space> },
+    { key: 'overview', label: '项目概况', children: <Space direction="vertical" size="large" className="full-width"><Card><Descriptions column={{ xs: 1, sm: 2 }} bordered><Descriptions.Item label="项目名称">{project.name}</Descriptions.Item><Descriptions.Item label="项目地址">{project.address || '滨江区江南大道 88 号'}</Descriptions.Item><Descriptions.Item label="负责人">{project.owner || '项目负责人甲'}</Descriptions.Item><Descriptions.Item label="项目状态"><StatusTag status={project.status} label={statusLabel(project.status)} /></Descriptions.Item><Descriptions.Item label="考勤规则">{project.workStart} - {project.workEnd}，宽限 {project.graceMinutes} 分钟</Descriptions.Item><Descriptions.Item label="年龄阈值">{ageConfig.ageThreshold} 岁</Descriptions.Item><Descriptions.Item label="年龄预警天数">提前 {ageConfig.ageWarningDays} 天 <Button type="link" disabled={!canManageProject} onClick={openAgeRuleEditor}>编辑年龄规则</Button></Descriptions.Item><Descriptions.Item label="门禁配置">绑定设备时选择出入口</Descriptions.Item><Descriptions.Item label="历史数据" span={{ xs: 1, sm: 2 }}>保留原始事件与考勤结果，只读查看</Descriptions.Item></Descriptions></Card><Card title="设备同步摘要"><div className="summary-strip"><StatisticItem label="项目设备" value={devices.length} /><StatisticItem label="在线" value={devices.filter((device) => device.online).length} /><StatisticItem label="同步失败" value={devices.filter((device) => device.syncStatus === 'failed').length} /><StatisticItem label="告警" value={visibleAlerts.length} /></div></Card><Card title="考勤统计"><div className="summary-strip"><StatisticItem label="今日正常" value={attendanceRecords.filter((item) => item.status === '正常').length} /><StatisticItem label="迟到" value={attendanceRecords.filter((item) => item.isLate).length} /><StatisticItem label="早退" value={attendanceRecords.filter((item) => item.isEarlyLeave).length} /><StatisticItem label="缺勤" value={attendanceRecords.filter((item) => item.status === '缺勤').length} /><StatisticItem label="请假" value={attendanceRecords.filter((item) => item.status === '请假').length} /><StatisticItem label="无需考勤" value={attendanceRecords.filter((item) => item.status === '无需考勤').length} /></div><p className="muted-text">统计当前项目演示日期的考勤结果，明细请进入“考勤记录”。</p></Card></Space> },
     { key: 'people', label: '项目人员', children: <Space direction="vertical" size="middle" className="full-width"><Card className="table-card"><Table rowKey="personId" columns={personColumns} dataSource={people} pagination={false} /></Card><Card title="特殊授权记录" className="table-card"><Table rowKey="id" dataSource={projectAuthorizations} pagination={false} columns={authorizationColumns} /></Card></Space> },
     { key: 'devices', label: '出入口与设备', children: deviceTab },
     { key: 'attendance', label: '考勤记录', forceRender: true, children: <AttendancePage role={role} lifecycleState={lifecycleState} projectsRecords={projectsRecords} peopleRecords={peopleRecords} projectPeople={projectPeople} rawEvents={rawEvents} fixedProjectId={project.id} embedded supplements={supplements} onSupplementsChange={onSupplementsChange} leaveRecords={leaveRecords} onLeaveRecordsChange={onLeaveRecordsChange} onOperationLog={onOperationLog} onOpenAccessRecords={onOpenAccessRecords} /> },
@@ -160,7 +188,7 @@ export default function ProjectDetailPage({ role, lifecycleState, projectsRecord
     { key: 'tools', label: '工具管理', children: <ToolsPage role={role} lifecycleState={lifecycleState} projectsRecords={projectsRecords} toolsRecords={toolsRecords} inspectionsRecords={inspectionsRecords} policy={toolInspectionPolicy} fixedProjectId={project.id} embedded onToolsChange={onToolsChange} onInspectionsChange={onInspectionsChange} onPolicyChange={onPolicyChange} onOperationLog={onOperationLog} onOpenMobileTool={onOpenMobileTool} /> },
   ];
 
-  return <div className="business-page"><PageHeader title={project.name} description="查看项目范围、人员、设备与现场业务状态。" breadcrumb={['首页', '项目管理', project.name]} extra={<Button icon={<ArrowLeftOutlined />} onClick={onBack}>返回项目列表</Button>} /><Tabs defaultActiveKey={defaultTab} items={items} /><DeviceBindingDrawer open={Boolean(bindingDevice)} onClose={() => setBindingDevice(null)} role={role} projectId={project.id} device={bindingDevice || { projectId: project.id, registered: false }} projects={projects} entrances={mockData.entrances} availableDevices={availableDevices} fixedProject onSubmit={updateBinding} onUnbind={removeBinding} /><Drawer title={editingAuthorization ? '修改特殊授权' : '新增特殊授权'} open={authorizationDrawerOpen} onClose={closeAuthorizationEditor} width={480}><Form form={authorizationForm} layout="vertical" onFinish={saveAuthorization}><Form.Item label="授权人" name="authorizer" rules={[{ required: true, message: '请输入授权人' }]}><Input /></Form.Item><Form.Item label="授权依据" name="basis" rules={[{ required: true, message: '请输入授权依据' }]}><Input.TextArea /></Form.Item><Form.Item label="人员" name="personId" rules={[{ required: true, message: '请选择人员' }]}><Select options={people.map((person) => ({ value: person.personId, label: person.name }))} /></Form.Item><Form.Item label="授权类型" name="type" rules={[{ required: true, message: '请输入授权类型' }]}><Input /></Form.Item><Form.Item label="生效时间" name="effectiveAt" rules={[{ required: true, message: '请选择生效时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item label="失效时间" name="expiresAt" rules={[{ required: true, message: '请选择失效时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Button type="primary" htmlType="submit">保存授权</Button></Form></Drawer></div>;
+  return <div className="business-page"><PageHeader title={project.name} description="查看项目范围、人员、设备与现场业务状态。" breadcrumb={['首页', '项目管理', project.name]} extra={<Button icon={<ArrowLeftOutlined />} onClick={onBack}>返回项目列表</Button>} /><Tabs defaultActiveKey={defaultTab} items={items} /><DeviceBindingDrawer open={Boolean(bindingDevice)} onClose={() => setBindingDevice(null)} role={role} projectId={project.id} device={bindingDevice || { projectId: project.id, registered: false }} projects={projects} entrances={mockData.entrances} availableDevices={availableDevices} fixedProject onSubmit={updateBinding} onUnbind={removeBinding} /><Drawer title={editingAuthorization ? '修改特殊授权' : '新增特殊授权'} open={authorizationDrawerOpen} onClose={closeAuthorizationEditor} width={480}><Form form={authorizationForm} layout="vertical" onFinish={saveAuthorization}><Form.Item label="授权人" name="authorizer" rules={[{ required: true, message: '请输入授权人' }]}><Input /></Form.Item><Form.Item label="授权依据" name="basis" rules={[{ required: true, message: '请输入授权依据' }]}><Input.TextArea /></Form.Item><Form.Item label="人员" name="personId" rules={[{ required: true, message: '请选择人员' }]}><Select options={people.map((person) => ({ value: person.personId, label: person.name }))} /></Form.Item><Form.Item label="授权类型" name="type" rules={[{ required: true, message: '请输入授权类型' }]}><Input /></Form.Item><Form.Item label="生效时间" name="effectiveAt" rules={[{ required: true, message: '请选择生效时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item label="失效时间" name="expiresAt" rules={[{ required: true, message: '请选择失效时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Button type="primary" htmlType="submit">保存授权</Button></Form></Drawer><Drawer title="编辑年龄规则" open={ageRuleDrawerOpen} onClose={() => { setAgeRuleDrawerOpen(false); ageRuleForm.resetFields(); }} width={420}><Form form={ageRuleForm} layout="vertical" onFinish={saveAgeRule}><Form.Item label="年龄阈值" name="ageThreshold" rules={[{ required: true, message: '请输入年龄阈值' }]}><InputNumber min={1} max={120} addonAfter="岁" style={{ width: '100%' }} /></Form.Item><Form.Item label="年龄预警天数" name="ageWarningDays" rules={[{ required: true, message: '请输入年龄预警天数' }]}><InputNumber min={0} max={3650} addonAfter="天" style={{ width: '100%' }} /></Form.Item><Button type="primary" htmlType="submit">保存年龄规则</Button></Form></Drawer></div>;
 }
 
 function StatisticItem({ label, value }) {

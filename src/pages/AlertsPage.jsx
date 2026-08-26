@@ -6,7 +6,7 @@ import PageHeader from '../components/PageHeader';
 import StatusTag from '../components/StatusTag';
 import { filterByDataScope } from '../domain/permissions';
 import mockData from '../data/mockData';
-import { DEMO_AS_OF_DATE, getAgeAccessState, makeDeviceRows, normalizeUser, projectName, scopedProjects } from './pageUtils';
+import { DEMO_AS_OF_DATE, getAgeAccessState, getProjectAgeConfig, makeDeviceRows, normalizeUser, projectName, scopedProjects } from './pageUtils';
 
 const TYPE_LABELS = {
   'device-offline': '设备离线',
@@ -31,7 +31,8 @@ export function buildAgeWarningAlerts({ asOfDate = DEMO_AS_OF_DATE, projects = m
     const person = people.find((item) => item.id === relation.personId);
     const project = projects.find((item) => item.id === relation.projectId);
     const authorization = authorizations.find((item) => item.projectId === relation.projectId && item.personId === relation.personId);
-    const access = getAgeAccessState({ birthDate: person?.birthDate, asOfDate, specialAuthorization: authorization });
+    const ageConfig = getProjectAgeConfig(project);
+    const access = getAgeAccessState({ birthDate: person?.birthDate, asOfDate, threshold: ageConfig.ageThreshold, warningDays: ageConfig.ageWarningDays, specialAuthorization: authorization });
     return access.status === 'warning' ? [{
       id: `age-warning-${relation.projectId}-${relation.personId}`,
       projectId: relation.projectId,

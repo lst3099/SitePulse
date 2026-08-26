@@ -1,10 +1,10 @@
 export const projects = [
   {
-    id: 'project-a', name: '滨江综合体项目', status: 'active', workStart: '09:00', workEnd: '18:00', graceMinutes: 15,
+    id: 'project-a', name: '滨江综合体项目', status: 'active', workStart: '09:00', workEnd: '18:00', graceMinutes: 15, ageThreshold: 60, ageWarningDays: 30,
     holidayDates: ['2026-10-01'], restDates: ['2026-08-30'], dayStatus: 'workday',
   },
   {
-    id: 'project-b', name: '北站枢纽项目', status: 'active', workStart: '08:30', workEnd: '17:30', graceMinutes: 10,
+    id: 'project-b', name: '北站枢纽项目', status: 'active', workStart: '08:30', workEnd: '17:30', graceMinutes: 10, ageThreshold: 60, ageWarningDays: 30,
     holidayDates: ['2026-10-01'], restDates: ['2026-08-29'], dayStatus: 'workday',
   },
 ];

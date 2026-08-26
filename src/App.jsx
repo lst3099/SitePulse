@@ -235,8 +235,8 @@ export default function App({ initialRole = 'systemAdmin', initialView, initialL
     setMobileInspectionTool(null);
   };
 
-  const refreshAgeWarnings = (current, nextPeople = peopleRecords, nextProjectPeople = projectPeople, nextAuthorizations = authorizations) => {
-    const nextAge = buildAgeWarningAlerts({ authorizations: nextAuthorizations, people: nextPeople, projectPeople: nextProjectPeople, projects: projectsRecords });
+  const refreshAgeWarnings = (current, nextPeople = peopleRecords, nextProjectPeople = projectPeople, nextAuthorizations = authorizations, nextProjects = projectsRecords) => {
+    const nextAge = buildAgeWarningAlerts({ authorizations: nextAuthorizations, people: nextPeople, projectPeople: nextProjectPeople, projects: nextProjects });
     const nextIds = new Set(nextAge.map((alert) => alert.id));
     const history = current.filter((alert) => alert.type === 'age-warning').map((alert) => nextIds.has(alert.id)
       ? { ...alert, ...nextAge.find((item) => item.id === alert.id), read: alert.read }
@@ -248,6 +248,11 @@ export default function App({ initialRole = 'systemAdmin', initialView, initialL
   const handlePeopleRecordsChange = (next) => {
     setPeopleRecords(next);
     setAlerts((current) => refreshAgeWarnings(current, next));
+  };
+
+  const handleProjectsRecordsChange = (next) => {
+    setProjectsRecords(next);
+    setAlerts((current) => refreshAgeWarnings(current, peopleRecords, projectPeople, authorizations, next));
   };
 
   const handleProjectPeopleChange = (next) => {
@@ -267,8 +272,8 @@ export default function App({ initialRole = 'systemAdmin', initialView, initialL
     }
     if (renderViewKey === 'projectOverview') {
       return selectedProjectId
-         ? <ProjectDetailPage role={role} lifecycleState={lifecycleState} projectsRecords={projectsRecords} peopleRecords={peopleRecords} projectPeople={projectPeople} registeredDevices={registeredDevices} selectedProjectId={selectedProjectId} authorizations={authorizations} leaveRecords={leaveRecords} supplements={supplements} rawEvents={attendance} alerts={alerts} toolsRecords={tools} inspectionsRecords={toolInspections} toolInspectionPolicy={toolInspectionPolicy} onToolsChange={handleToolsChange} onInspectionsChange={handleToolInspectionsChange} onPolicyChange={handleToolPolicyChange} onAuthorizationsChange={handleAuthorizationsChange} onSupplementsChange={setSupplements} onLeaveRecordsChange={setLeaveRecords} onOperationLog={handleOperationLog} onOpenMobileTool={handleOpenMobileTool} onDeviceChange={handleDeviceChange} onOpenAccessRecords={handleOpenAccessRecords} onBack={() => setSelectedProjectId(null)} />
-         : <ProjectListPage role={role} lifecycleState={lifecycleState} projectsRecords={projectsRecords} onProjectsRecordsChange={setProjectsRecords} onProjectLifecycle={handleProjectLifecycle} onOperationLog={handleOperationLog} onOpenProject={setSelectedProjectId} />;
+         ? <ProjectDetailPage role={role} lifecycleState={lifecycleState} projectsRecords={projectsRecords} peopleRecords={peopleRecords} projectPeople={projectPeople} registeredDevices={registeredDevices} selectedProjectId={selectedProjectId} authorizations={authorizations} leaveRecords={leaveRecords} supplements={supplements} rawEvents={attendance} alerts={alerts} toolsRecords={tools} inspectionsRecords={toolInspections} toolInspectionPolicy={toolInspectionPolicy} onToolsChange={handleToolsChange} onInspectionsChange={handleToolInspectionsChange} onPolicyChange={handleToolPolicyChange} onAuthorizationsChange={handleAuthorizationsChange} onSupplementsChange={setSupplements} onLeaveRecordsChange={setLeaveRecords} onOperationLog={handleOperationLog} onOpenMobileTool={handleOpenMobileTool} onDeviceChange={handleDeviceChange} onOpenAccessRecords={handleOpenAccessRecords} onProjectsRecordsChange={handleProjectsRecordsChange} onBack={() => setSelectedProjectId(null)} />
+         : <ProjectListPage role={role} lifecycleState={lifecycleState} projectsRecords={projectsRecords} onProjectsRecordsChange={handleProjectsRecordsChange} onProjectLifecycle={handleProjectLifecycle} onOperationLog={handleOperationLog} onOpenProject={setSelectedProjectId} />;
     }
     if (renderViewKey === 'people') return <PeoplePage role={role} lifecycleState={lifecycleState} projectsRecords={projectsRecords} peopleRecords={peopleRecords} onPeopleRecordsChange={handlePeopleRecordsChange} projectPeople={projectPeople} onProjectPeopleChange={handleProjectPeopleChange} registeredDevices={registeredDevices} authorizations={authorizations} accounts={accounts} onAccountsChange={setAccounts} onOperationLog={handleOperationLog} onNavigate={handleNavigate} />;
     if (renderViewKey === 'deviceAccess' || renderViewKey === 'deviceRegistration') return <DevicesPage role={role} lifecycleState={lifecycleState} projectsRecords={projectsRecords} projectPeople={projectPeople} peopleRecords={peopleRecords} registeredDevices={registeredDevices} onRegisteredDevicesChange={setRegisteredDevices} authorizations={authorizations} onDeviceChange={handleDeviceChange} onOperationLog={handleOperationLog} registrationMode={renderViewKey === 'deviceRegistration'} />;
