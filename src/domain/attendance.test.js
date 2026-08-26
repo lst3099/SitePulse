@@ -101,9 +101,32 @@ describe('attendance rules', () => {
     );
 
     expect(initial.status).toBe('正常');
-    expect(initial.firstEntryAt).toBeNull();
+    expect(initial.firstPunchAt).toContain('18:00');
+    expect(initial.lastPunchAt).toContain('18:00');
     expect(recalculated.firstEntryAt).toContain('09:20');
     expect(recalculated.isLate).toBe(true);
+  });
+
+  it('uses chronological first and last effective punches without reading gate direction', () => {
+    const result = calculateDailyAttendance([
+      { ...baseEvent, direction: undefined, eventSerial: 'punch-late', eventTime: '2026-08-25T09:20:00+08:00' },
+      { ...baseEvent, direction: undefined, eventSerial: 'punch-early', eventTime: '2026-08-25T17:30:00+08:00' },
+    ], {
+      projectId: 'project-a',
+      personId: 'person-1',
+      date: '2026-08-25',
+      workStart: '09:00',
+      workEnd: '18:00',
+      graceMinutes: 15,
+    });
+
+    expect(result.status).toBe('正常');
+    expect(result.firstPunchAt).toContain('09:20');
+    expect(result.lastPunchAt).toContain('17:30');
+    expect(result.firstEntryAt).toContain('09:20');
+    expect(result.lastExitAt).toContain('17:30');
+    expect(result.isLate).toBe(true);
+    expect(result.isEarlyLeave).toBe(true);
   });
 
   it('marks only a direction that has evidence and never invents late or early-leave results', () => {

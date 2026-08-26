@@ -76,12 +76,6 @@ function isFaceFailure(record) {
   );
 }
 
-function directionOf(record) {
-  if (record.direction === 'in' || record.direction === 'entry' || record.direction === '进门') return 'in';
-  if (record.direction === 'out' || record.direction === 'exit' || record.direction === '出门') return 'out';
-  return null;
-}
-
 function timeInMinutes(value) {
   const text = String(value ?? '');
   const match = text.match(/(?:T|\s)?(\d{1,2}):(\d{2})(?::(\d{2}))?/);
@@ -171,6 +165,8 @@ export function calculateDailyAttendance(events, options = {}) {
       leave,
       rawRecords,
       effectiveRecords: [],
+      firstPunchAt: null,
+      lastPunchAt: null,
       firstEntryAt: null,
       lastExitAt: null,
       isLate: false,
@@ -186,6 +182,8 @@ export function calculateDailyAttendance(events, options = {}) {
       status: '无需考勤',
       rawRecords,
       effectiveRecords: [],
+      firstPunchAt: null,
+      lastPunchAt: null,
       firstEntryAt: null,
       lastExitAt: null,
       isLate: false,
@@ -194,15 +192,14 @@ export function calculateDailyAttendance(events, options = {}) {
   }
 
   const effectiveRecords = [...rawRecords.filter((event) => event.isEffective), ...supplementRecords];
-  const entries = effectiveRecords.filter((event) => directionOf(event) === 'in');
-  const exits = effectiveRecords.filter((event) => directionOf(event) === 'out');
-  const firstEntry = entries.toSorted((a, b) => String(a.eventTime).localeCompare(String(b.eventTime)))[0];
-  const lastExit = exits.toSorted((a, b) => String(b.eventTime).localeCompare(String(a.eventTime)))[0];
+  const punches = effectiveRecords.toSorted((a, b) => String(a.eventTime).localeCompare(String(b.eventTime)));
+  const firstPunch = punches[0];
+  const lastPunch = punches.at(-1);
   const start = timeInMinutes(options.workStart);
   const end = timeInMinutes(options.workEnd);
   const grace = Number(options.graceMinutes || 0);
-  const entryTime = firstEntry ? timeInMinutes(firstEntry.eventTime) : null;
-  const exitTime = lastExit ? timeInMinutes(lastExit.eventTime) : null;
+  const firstPunchTime = firstPunch ? timeInMinutes(firstPunch.eventTime) : null;
+  const lastPunchTime = lastPunch ? timeInMinutes(lastPunch.eventTime) : null;
 
   return {
     projectId: options.projectId,
@@ -211,10 +208,12 @@ export function calculateDailyAttendance(events, options = {}) {
     status: effectiveRecords.length ? '正常' : '缺勤',
     rawRecords,
     effectiveRecords,
-    firstEntryAt: firstEntry?.eventTime || null,
-    lastExitAt: lastExit?.eventTime || null,
-    isLate: entryTime !== null && start !== null ? entryTime > start + grace : false,
-    isEarlyLeave: exitTime !== null && end !== null ? exitTime < end - grace : false,
+    firstPunchAt: firstPunch?.eventTime || null,
+    lastPunchAt: lastPunch?.eventTime || null,
+    firstEntryAt: firstPunch?.eventTime || null,
+    lastExitAt: lastPunch?.eventTime || null,
+    isLate: firstPunchTime !== null && start !== null ? firstPunchTime > start + grace : false,
+    isEarlyLeave: lastPunchTime !== null && end !== null ? lastPunchTime < end - grace : false,
   };
 }
 
