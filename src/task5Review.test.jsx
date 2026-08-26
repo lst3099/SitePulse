@@ -502,6 +502,14 @@ describe('Task 5 PC pages', () => {
     expect(makePersonRows(admin, createLifecycleState(), undefined, result.projectPeople, [], result.peopleRecords)).toContainEqual(expect.objectContaining({ id: result.person.id, name: '共享新人员' }));
   });
 
+  it('keeps a saved profession when building person rows', () => {
+    const result = buildPersonRecord({ name: '专业人员', profession: '塔吊司机' }, { peopleRecords: mockData.people, projectPeople: [], projects: mockData.projects, user: admin });
+    const rows = makePersonRows(admin, createLifecycleState(), undefined, result.projectPeople, [], result.peopleRecords, mockData.projects);
+
+    expect(result.person).toHaveProperty('profession', '塔吊司机');
+    expect(rows).toContainEqual(expect.objectContaining({ id: result.person.id, profession: '塔吊司机' }));
+  });
+
   it('uses App-provided registered devices when calculating people access', () => {
     const registered = [{ id: 'device-local-replacement', projectId: 'project-a', entranceId: 'entrance-a-in', registered: true, online: true, syncStatus: 'success' }];
     const person = makePersonRows(admin, createLifecycleState(), undefined, mockData.projectPeople, registered).find((item) => item.id === 'person-1');

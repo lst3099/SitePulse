@@ -77,6 +77,7 @@ export function PersonDrawerContent({
         {canView('name') && <Form.Item label="姓名" name="name" rules={[{ required: true, whitespace: true, message: '请输入姓名' }]}><Input /></Form.Item>}
         {canView('idCardNumber') && <Form.Item label="身份证号" name="idCardNumber" rules={[{ required: true, whitespace: true, message: '请输入身份证号' }, getUniqueFieldRule('idCardNumber', '身份证号', uniqueRecords, person.id)]}><Input readOnly={mode === 'view'} /></Form.Item>}
         {canView('phone') && <Form.Item label="联系电话" name="phone" rules={[{ required: true, whitespace: true, message: '请输入联系电话' }, getUniqueFieldRule('phone', '联系电话', uniqueRecords, person.id)]}><Input /></Form.Item>}
+        {canView('profession') && <Form.Item label="专业" name="profession" rules={[{ required: true, whitespace: true, message: '请输入专业' }]}><Input /></Form.Item>}
 
         {mode === 'view' && (
           <>
@@ -90,7 +91,6 @@ export function PersonDrawerContent({
 
         <Divider />
         <Typography.Title level={5}>门禁资料</Typography.Title>
-        {canView('registered') && <Form.Item label="人员注册状态" name="registered"><Input /></Form.Item>}
         {canView('face') && (
           <Form.Item label="人脸照片" name="faceImage" valuePropName="fileList" getValueFromEvent={normalizeUploadEvent} required={!hasExistingFace} rules={[{ validator: (_, value) => hasExistingFace || hasUpload(value) ? Promise.resolve() : Promise.reject(new Error('请上传人脸照片')) }]}>
             <Upload accept="image/*" beforeUpload={() => false} maxCount={1} listType="picture" disabled={!canEditSensitive}>

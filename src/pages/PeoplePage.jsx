@@ -154,7 +154,7 @@ export default function PeoplePage({ role, lifecycleState, projectsRecords = moc
     { title: '姓名', dataIndex: 'name', key: 'name' },
     { title: '身份证（脱敏）', dataIndex: 'idCardNumber', key: 'idCardNumber', render: (value) => value ? `${String(value).slice(0, 3)}********` : '—' },
     { title: '电话', dataIndex: 'phone', key: 'phone' },
-    { title: '队伍 / 专业', key: 'team', render: (_, person) => `${person.team} / ${person.profession}` },
+    { title: '专业', dataIndex: 'profession', key: 'profession' },
     { title: '绑定项目', key: 'projectCount', render: (_, person) => <Button type="link" className="project-count-button" onClick={() => messageApi.info(getBoundProjectMessage(person))}>{person.projectCount}</Button> },
     { title: '账号绑定', key: 'accountBinding', render: (_, person) => <div className="account-summary"><StatusTag status={person.accountBindingState === 'bound' ? 'success' : person.accountBindingState === 'inactive' ? 'warning' : 'normal'} label={person.accountBindingState === 'bound' ? '已绑定' : person.accountBindingState === 'inactive' ? '账号已停用' : '未绑定'} /><div>{person.accountName || '未关联系统账号'}</div>{person.accountBindingState !== 'unbound' && <div className="muted-text">门禁权限独立管理</div>}</div> },
     { title: '人脸', dataIndex: 'face', key: 'face', render: (value) => <StatusTag status={value === '已登记' ? 'success' : 'warning'} label={value} /> },

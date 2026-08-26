@@ -287,7 +287,7 @@ export function makePersonRows(role, lifecycleState, authorizations = mockData.s
       projectRelationships: visibleRelations,
       phone: person.id === 'person-1' ? '13800000000' : person.id === 'person-2' ? '13900000000' : '13700000000',
       team: person.id === 'person-3' ? '钢筋一队' : '土建一队',
-      profession: person.id === 'person-2' ? '电工' : '钢筋工',
+      profession: person.profession || (person.id === 'person-2' ? '电工' : '钢筋工'),
       accountId: account?.accountId,
       accountName: account?.name,
       accountBindingState: account ? account.status === 'inactive' ? 'inactive' : 'bound' : 'unbound',

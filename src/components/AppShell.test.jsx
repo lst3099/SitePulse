@@ -6,6 +6,7 @@ import StatusTag from './StatusTag';
 import PageHeader from './PageHeader';
 import FilterBar from './FilterBar';
 import { getEditableProjectOptions, getUniqueFieldRule, PersonDrawerContent, submitPersonEdit } from './PersonDrawer';
+import PeoplePage from '../pages/PeoplePage';
 import { DeviceBindingForm } from './DeviceBindingDrawer';
 import { DetailDrawerContent } from './DetailDrawer';
 
@@ -148,6 +149,26 @@ describe('PC shell and shared components', () => {
       expect(markup).not.toContain('人员状态');
     }
     expect(view).toContain('项目关系');
+  });
+
+  it('uses profession in the people list and requires it in person forms', () => {
+    const drawer = render(
+      <PersonDrawerContent
+        mode="edit"
+        role={{ role: 'systemAdmin' }}
+        person={{ projectId: 'project-a', projectOptions: [{ value: 'project-a', label: '项目 A' }] }}
+        onSubmit={() => {}}
+      />,
+    );
+    const view = render(<PersonDrawerContent mode="view" role={{ role: 'systemAdmin' }} person={{ projectId: 'project-a' }} />);
+    const peoplePage = render(<PeoplePage role={{ role: 'systemAdmin' }} />);
+
+    expect(drawer).toContain('专业');
+    expect(drawer).toContain('id="profession" aria-required="true"');
+    expect(drawer).not.toContain('人员注册状态');
+    expect(view).not.toContain('人员注册状态');
+    expect(peoplePage).toContain('专业');
+    expect(peoplePage).not.toContain('队伍 / 专业');
   });
 
   it('only renders the person save action for admin and in-scope project owner', () => {
