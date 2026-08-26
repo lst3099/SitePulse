@@ -21,7 +21,8 @@ describe('App lifecycle state page chain', () => {
     expect(appMarkup).toContain('已停用');
     expect(detailMarkup).toContain('已停用');
     expect(detailMarkup).toContain('历史数据');
-    expect(peopleMarkup).toContain('禁止');
+    expect(peopleMarkup).toContain('58 岁');
+    expect(peopleMarkup).not.toContain('年龄 / 权限');
     expect(devicesMarkup).toContain('已停用');
   });
 

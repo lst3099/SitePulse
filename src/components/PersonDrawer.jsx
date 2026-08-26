@@ -101,12 +101,26 @@ export function PersonDrawerContent({
         <Typography.Paragraph type="secondary">请上传清晰正面照片，用于现场人脸核验。</Typography.Paragraph>
 
         <Divider />
-        <Typography.Title level={5}>健康报告/资质证书</Typography.Title>
+        <Typography.Title level={5}>健康证/资质证书</Typography.Title>
         {canView('healthReport') && (
-          <Form.Item label="健康报告（选填）" name="healthReport" valuePropName="fileList" getValueFromEvent={normalizeUploadEvent}>
+          <Form.Item label="健康证（选填）" name="healthReport" valuePropName="fileList" getValueFromEvent={normalizeUploadEvent}>
             <Upload accept="image/*" beforeUpload={() => false} maxCount={1} listType="picture">
-              <Button>上传健康报告图片</Button>
+              <Button>上传健康证照片</Button>
             </Upload>
+          </Form.Item>
+        )}
+        {canView('healthReport') && (
+          <Form.Item
+            label="健康证有效期至"
+            name="healthReportExpiresAt"
+            dependencies={['healthReport']}
+            rules={[({ getFieldValue }) => ({
+              validator: (_, value) => hasUpload(getFieldValue('healthReport')) && !value
+                ? Promise.reject(new Error('有健康证时必须填写健康证有效期'))
+                : Promise.resolve(),
+            })]}
+          >
+            <Input type="date" />
           </Form.Item>
         )}
         {canView('qualification') && (

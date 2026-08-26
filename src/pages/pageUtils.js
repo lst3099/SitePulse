@@ -4,6 +4,8 @@ import { filterByDataScope } from '../domain/permissions';
 import dayjs from 'dayjs';
 
 export const DEMO_AS_OF_DATE = '2026-08-25';
+export const DEFAULT_AGE_THRESHOLD = 60;
+export const DEFAULT_AGE_WARNING_DAYS = 30;
 
 export function normalizeUser(role) {
   return typeof role === 'string' ? { role } : role || {};
@@ -111,6 +113,13 @@ export function getAgeAccessState({
   if (asOf >= forbiddenDate) return { age, status: 'forbidden', allowed: false, warning: false, reason: '超过年龄阈值次日禁止进入' };
   if (asOf >= warningDate) return { age, status: 'warning', allowed: true, warning: true, reason: '接近年龄阈值，提前预警' };
   return { age, status: 'normal', allowed: true, warning: false, reason: '年龄规则正常' };
+}
+
+export function getProjectAgeConfig(project = {}) {
+  return {
+    ageThreshold: Number.isFinite(Number(project.ageThreshold)) ? Number(project.ageThreshold) : DEFAULT_AGE_THRESHOLD,
+    ageWarningDays: Number.isFinite(Number(project.ageWarningDays)) ? Number(project.ageWarningDays) : DEFAULT_AGE_WARNING_DAYS,
+  };
 }
 
 export function createLifecycleState() {
@@ -226,8 +235,15 @@ function mergeDevices(registeredDevices = []) {
   return [...mockData.devices.filter((device) => !registeredKeys.has(`${device.projectId || ''}:${device.entranceId || ''}`)), ...registeredDevices];
 }
 
-function healthLabel(status) {
-  return { valid: '有效', expired: '已过期', missing: '缺失' }[status] || '缺失';
+function healthStatus(status, expiresAt) {
+  if (!status || status === 'missing') return 'missing';
+  if (status === 'expired') return 'expired';
+  const expiryDate = toDateKey(expiresAt);
+  return expiryDate && expiryDate < DEMO_AS_OF_DATE ? 'expired' : 'valid';
+}
+
+function healthLabel(status, expiresAt) {
+  return { valid: '有效', expired: '已过期', missing: '缺失' }[healthStatus(status, expiresAt)];
 }
 
 export function getSpecialAuthorizationStatus(authorization, asOfDate = DEMO_AS_OF_DATE) {
@@ -251,7 +267,8 @@ export function makePersonRows(role, lifecycleState, authorizations = mockData.s
       const lifecycle = lifecycleState?.personOverrides?.[`${relation.projectId}:${relation.personId}`];
       const projectOverride = lifecycleState?.projectOverrides?.[relation.projectId];
       const authorization = authorizations.find((item) => item.personId === relation.personId && item.projectId === relation.projectId);
-      const relationAgeAccess = getAgeAccessState({ birthDate: person.birthDate, asOfDate: DEMO_AS_OF_DATE, specialAuthorization: authorization });
+      const ageConfig = getProjectAgeConfig(project);
+      const relationAgeAccess = getAgeAccessState({ birthDate: person.birthDate, asOfDate: DEMO_AS_OF_DATE, threshold: ageConfig.ageThreshold, warningDays: ageConfig.ageWarningDays, specialAuthorization: authorization });
       const lifecyclePermission = lifecycle?.permission || (project?.status === 'active' ? '允许' : '禁止');
       const deviceAvailable = hasEffectiveProjectDevice(relation.projectId, lifecycleState, registeredDevices, projectsRecords);
       const devicePermissionState = getProjectDevicePermission(relation.projectId, lifecycleState, undefined, registeredDevices, projectsRecords);
@@ -294,8 +311,8 @@ export function makePersonRows(role, lifecycleState, authorizations = mockData.s
       accountStatus: account?.status,
       account: account?.name || '未开通',
       face: person.registered ? '已登记' : '未登记',
-      healthReportStatus: person.healthReportStatus || 'missing',
-      health: healthLabel(person.healthReportStatus),
+      healthReportStatus: healthStatus(person.healthReportStatus, person.healthReportExpiresAt),
+      health: healthLabel(person.healthReportStatus, person.healthReportExpiresAt),
       age: ageAccessState.age,
       ageAccessState: ageAccessState.status,
       ageAccessReason: ageAccessState.reason,
@@ -413,6 +430,8 @@ export function makeDeviceRows(role, lifecycleState, authorizations = mockData.s
     const deviceOverride = overrides[device.id] || {};
     const effectiveProjectId = Object.prototype.hasOwnProperty.call(deviceOverride, 'projectId') ? deviceOverride.projectId : device.projectId;
     const projectStatus = projectOverrides[effectiveProjectId]?.status || projectsRecords.find((project) => project.id === effectiveProjectId)?.status || 'active';
+    const project = projectsRecords.find((item) => item.id === effectiveProjectId);
+    const ageConfig = getProjectAgeConfig(project);
     const effectiveSyncStatus = deviceOverride.syncStatus ?? device.syncStatus ?? device.permissionSync ?? sync.status ?? 'success';
     const overrideEffectivePermission = Object.prototype.hasOwnProperty.call(deviceOverride, 'effectivePermission') ? deviceOverride.effectivePermission : undefined;
     const rawEffectivePermission = overrideEffectivePermission !== undefined ? overrideEffectivePermission : (device.effectivePermission !== undefined ? device.effectivePermission : (sync.effectivePermission !== undefined ? sync.effectivePermission : (device.platformPermission ?? sync.platformPermission) !== 'deny'));
@@ -424,7 +443,7 @@ export function makeDeviceRows(role, lifecycleState, authorizations = mockData.s
       .some((relation) => {
         const person = peopleRecords.find((item) => item.id === relation.personId);
         const authorization = authorizations.find((item) => item.projectId === relation.projectId && item.personId === relation.personId);
-        return getAgeAccessState({ birthDate: person?.birthDate, asOfDate: DEMO_AS_OF_DATE, specialAuthorization: authorization }).allowed === false;
+        return getAgeAccessState({ birthDate: person?.birthDate, asOfDate: DEMO_AS_OF_DATE, threshold: ageConfig.ageThreshold, warningDays: ageConfig.ageWarningDays, specialAuthorization: authorization }).allowed === false;
       });
     const projectLifecycle = projectStatus === 'active' ? {} : {
       lifecycleStatus: projectStatus === 'archived' ? 'archived' : 'stopped',

@@ -6,7 +6,8 @@ import StatusTag from './StatusTag';
 import PageHeader from './PageHeader';
 import FilterBar from './FilterBar';
 import { getEditableProjectOptions, getUniqueFieldRule, PersonDrawerContent, submitPersonEdit } from './PersonDrawer';
-import PeoplePage from '../pages/PeoplePage';
+import PeoplePage, { buildPersonRecord } from '../pages/PeoplePage';
+import mockData from '../data/mockData';
 import { DeviceBindingForm } from './DeviceBindingDrawer';
 import { DetailDrawerContent } from './DetailDrawer';
 
@@ -89,9 +90,10 @@ describe('PC shell and shared components', () => {
     expect(person).toContain('基础资料');
     expect(person).toContain('项目关系');
     expect(person).toContain('门禁资料');
-    expect(person).toContain('健康报告/资质证书');
+    expect(person).toContain('健康证/资质证书');
     expect(editablePerson).toContain('人脸照片');
-    expect(editablePerson).toContain('上传健康报告图片');
+    expect(editablePerson).toContain('上传健康证照片');
+    expect(editablePerson).toContain('健康证有效期至');
     expect(editablePerson).toContain('上传资质证书图片');
     expect(person).not.toContain('姓名');
     expect(person).not.toContain('联系电话');
@@ -169,6 +171,29 @@ describe('PC shell and shared components', () => {
     expect(view).not.toContain('人员注册状态');
     expect(peoplePage).toContain('专业');
     expect(peoplePage).not.toContain('队伍 / 专业');
+  });
+
+  it('shows person photos, health certificate expiry and calculated age without permission status', () => {
+    const peoplePage = render(<PeoplePage role={{ role: 'systemAdmin' }} />);
+
+    expect(peoplePage).toContain('>人脸<');
+    expect(peoplePage).toContain('查看照片');
+    expect(peoplePage).toContain('>健康证<');
+    expect(peoplePage).toContain('>有效期<');
+    expect(peoplePage).toContain('>年龄<');
+    expect(peoplePage).not.toContain('>年龄 / 权限<');
+  });
+
+  it('requires a health certificate expiry date when a certificate is uploaded', () => {
+    const result = buildPersonRecord({
+      name: '新人员',
+      idCardNumber: 'mock-id-new',
+      phone: '13800000001',
+      profession: '电工',
+      healthReport: [{ uid: 'health-1', name: 'health.jpg' }],
+    }, { projectPeople: [], projects: mockData.projects, user: { role: 'systemAdmin' } });
+
+    expect(result.error).toBe('有健康证时必须填写健康证有效期');
   });
 
   it('only renders the person save action for admin and in-scope project owner', () => {

@@ -297,7 +297,7 @@ describe('Task 5 PC pages', () => {
     const state = createLifecycleState();
     expect(makePersonRows(admin, state, [authorization]).find((person) => person.id === 'person-3').projectRelationships.find((item) => item.projectId === 'project-b')).toMatchObject({ ageAccessState: 'allowed', accessStatus: 'revoked', effectivePermission: false });
     expect(makeDeviceRows(admin, state, [authorization]).find((device) => device.id === 'device-b-main')).toMatchObject({ accessStatus: 'revoked', effectivePermission: false });
-    expect(renderToStaticMarkup(<PeoplePage role={admin} lifecycleState={state} authorizations={[authorization]} />)).toContain('特殊授权有效期内');
+    expect(renderToStaticMarkup(<PeoplePage role={admin} lifecycleState={state} authorizations={[authorization]} />)).not.toContain('特殊授权有效期内');
     expect(renderToStaticMarkup(<DevicesPage role={admin} lifecycleState={state} authorizations={[authorization]} />)).toContain('权限同步');
     expect(renderToStaticMarkup(<ProjectDetailPage role={admin} lifecycleState={state} selectedProjectId="project-b" authorizations={[authorization]} />)).toContain('考勤记录');
   });
@@ -448,10 +448,11 @@ describe('Task 5 PC pages', () => {
       projectId: 'project-a',
       faceImage: [{ uid: 'face-1', name: 'face.jpg' }],
       healthReport: [{ uid: 'health-1', name: 'health.jpg' }],
+      healthReportExpiresAt: '2027-08-24',
       qualifications: [{ uid: 'certificate-1', name: 'certificate-a.jpg' }, { uid: 'certificate-2', name: 'certificate-b.jpg' }],
     }, { projectPeople: [], projects: mockData.projects, user: admin });
 
-    expect(result.person).toMatchObject({ registered: true, healthReportStatus: 'valid' });
+    expect(result.person).toMatchObject({ registered: true, healthReportStatus: 'valid', healthReportExpiresAt: '2027-08-24' });
     expect(result.person.projectRelationships[0]).toMatchObject({ projectId: 'project-a', projectName: '滨江综合体项目' });
     expect(result.person.qualifications).toHaveLength(2);
   });

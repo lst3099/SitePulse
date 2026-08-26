@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Card, Input, Select, Table, message } from 'antd';
+import { Button, Card, Image, Input, Modal, Select, Table, message } from 'antd';
 import { EditOutlined, PlusOutlined } from '@ant-design/icons';
 import AccountBindingDrawer from '../components/AccountBindingDrawer';
 import FilterBar from '../components/FilterBar';
@@ -9,7 +9,7 @@ import StatusTag from '../components/StatusTag';
 import { bindWorkerAccount, buildAccountBindingLog, getBindableAccounts, getPersonAccount, unbindWorkerAccount } from '../domain/accounts';
 import { canOperate } from '../domain/permissions';
 import mockData from '../data/mockData';
-import { buildPersonEditLog, makePersonRows, normalizeUser, scopedProjects } from './pageUtils';
+import { buildPersonEditLog, DEMO_AS_OF_DATE, makePersonRows, normalizeUser, scopedProjects } from './pageUtils';
 
 export function buildPersonRecord(values = {}, { peopleRecords = mockData.people, projectPeople = mockData.projectPeople, projects = mockData.projects, user = {}, existingPerson } = {}) {
   const project = values.projectId ? projects.find((item) => item.id === values.projectId) : undefined;
@@ -17,6 +17,11 @@ export function buildPersonRecord(values = {}, { peopleRecords = mockData.people
   if (!values.projectId && !canOperate(user, 'editPerson')) return { error: '当前角色无权新增未绑定项目的人员' };
   const hasFaceImage = Array.isArray(values.faceImage) ? values.faceImage.length > 0 : Boolean(values.faceImage);
   const hasHealthReport = Array.isArray(values.healthReport) ? values.healthReport.length > 0 : Boolean(values.healthReport);
+  const existingRecord = peopleRecords.find((item) => item.id === (existingPerson?.id || existingPerson?.personId));
+  const healthReportExpiresAt = String(Object.prototype.hasOwnProperty.call(values, 'healthReportExpiresAt')
+    ? values.healthReportExpiresAt
+    : existingRecord?.healthReportExpiresAt || existingPerson?.healthReportExpiresAt || '').trim();
+  if (hasHealthReport && !healthReportExpiresAt) return { error: '有健康证时必须填写健康证有效期' };
   const personId = existingPerson?.personId || existingPerson?.id || values.personId || `person-local-${Date.now()}`;
   const relation = project ? { projectId: values.projectId, projectName: project.name, personId, status: values.relationStatus || 'active' } : null;
   const hasRelation = relation && projectPeople.some((item) => item.personId === personId && item.projectId === relation.projectId);
@@ -29,7 +34,6 @@ export function buildPersonRecord(values = {}, { peopleRecords = mockData.people
     ...item,
     projectName: item.projectName || projects.find((projectItem) => projectItem.id === item.projectId)?.name || mockData.projects.find((projectItem) => projectItem.id === item.projectId)?.name || '未分配项目',
   }));
-  const existingRecord = peopleRecords.find((item) => item.id === (existingPerson?.id || existingPerson?.personId));
   const person = {
     ...(existingRecord || {}),
     ...(existingPerson || {}),
@@ -37,7 +41,8 @@ export function buildPersonRecord(values = {}, { peopleRecords = mockData.people
     id: existingPerson?.id || personId,
     personId,
     registered: hasFaceImage ? true : existingRecord?.registered ?? existingPerson?.registered ?? false,
-    healthReportStatus: hasHealthReport ? 'valid' : existingRecord?.healthReportStatus || existingPerson?.healthReportStatus || 'missing',
+    healthReportStatus: hasHealthReport ? healthReportExpiresAt < DEMO_AS_OF_DATE ? 'expired' : 'valid' : existingRecord?.healthReportStatus || existingPerson?.healthReportStatus || 'missing',
+    healthReportExpiresAt: hasHealthReport ? healthReportExpiresAt : undefined,
     projectIds: projectRelationships.map((item) => item.projectId),
     projectCount: projectRelationships.length,
     projectRelationships,
@@ -77,6 +82,7 @@ export default function PeoplePage({ role, lifecycleState, projectsRecords = moc
   const [filters, setFilters] = useState({ name: '', projectId: 'all', accountState: 'all' });
   const [drawer, setDrawer] = useState({ open: false, mode: 'view', person: null });
   const [accountDrawer, setAccountDrawer] = useState({ open: false, person: null });
+  const [photoPreview, setPhotoPreview] = useState({ open: false, title: '', src: '', objectUrl: '' });
   const people = useMemo(() => {
     const rows = makePersonRows(role, lifecycleState, authorizations, projectPeople, registeredDevices, peopleRecords, projectsRecords, accounts).map((person) => ({ ...person, ...(peopleEdits[person.id] || {}) }));
     const rowIds = new Set(rows.map((person) => person.id));
@@ -150,6 +156,18 @@ export default function PeoplePage({ role, lifecycleState, projectsRecords = moc
   const selectedAccountPerson = accountDrawer.person ? people.find((person) => person.id === accountDrawer.person.id) || accountDrawer.person : null;
   const selectedAccount = selectedAccountPerson ? getPersonAccount(accounts, selectedAccountPerson.id) : null;
   const bindableAccounts = selectedAccountPerson ? getBindableAccounts(accounts, selectedAccountPerson, getAccountProjectContext(selectedAccountPerson)) : [];
+  const closePhotoPreview = () => {
+    if (photoPreview.objectUrl) URL.revokeObjectURL(photoPreview.objectUrl);
+    setPhotoPreview({ open: false, title: '', src: '', objectUrl: '' });
+  };
+  const openPhotoPreview = (title, value) => {
+    const file = Array.isArray(value) ? value[0] : value;
+    const src = typeof file === 'string' ? (/^(https?:|data:|\/)/.test(file) ? file : '') : file?.url || file?.thumbUrl || file?.response?.url || '';
+    const objectUrl = !src && file?.originFileObj && typeof URL !== 'undefined' && URL.createObjectURL ? URL.createObjectURL(file.originFileObj) : '';
+    setPhotoPreview({ open: true, title, src: src || objectUrl, objectUrl });
+  };
+  const hasFacePhoto = (person) => Boolean(person.faceImage) || person.registered === true;
+  const hasHealthCertificate = (person) => Boolean(person.healthReport) || ['valid', 'expired'].includes(person.healthReportStatus);
   const columns = [
     { title: '姓名', dataIndex: 'name', key: 'name' },
     { title: '身份证（脱敏）', dataIndex: 'idCardNumber', key: 'idCardNumber', render: (value) => value ? `${String(value).slice(0, 3)}********` : '—' },
@@ -157,15 +175,12 @@ export default function PeoplePage({ role, lifecycleState, projectsRecords = moc
     { title: '专业', dataIndex: 'profession', key: 'profession' },
     { title: '绑定项目', key: 'projectCount', render: (_, person) => <Button type="link" className="project-count-button" onClick={() => messageApi.info(getBoundProjectMessage(person))}>{person.projectCount}</Button> },
     { title: '账号绑定', key: 'accountBinding', render: (_, person) => <div className="account-summary"><StatusTag status={person.accountBindingState === 'bound' ? 'success' : person.accountBindingState === 'inactive' ? 'warning' : 'normal'} label={person.accountBindingState === 'bound' ? '已绑定' : person.accountBindingState === 'inactive' ? '账号已停用' : '未绑定'} /><div>{person.accountName || '未关联系统账号'}</div>{person.accountBindingState !== 'unbound' && <div className="muted-text">门禁权限独立管理</div>}</div> },
-    { title: '人脸', dataIndex: 'face', key: 'face', render: (value) => <StatusTag status={value === '已登记' ? 'success' : 'warning'} label={value} /> },
-    { title: '健康', dataIndex: 'health', key: 'health', render: (value) => <StatusTag status={value === '有效' ? 'success' : value === '缺失' ? 'warning' : 'error'} label={value} /> },
-    { title: '年龄 / 权限', key: 'age', render: (_, person) => <SpaceText age={person.age} permission={person.permission} reason={person.ageAccessReason} /> },
+    { title: '人脸', key: 'faceImage', render: (_, person) => hasFacePhoto(person) ? <Button type="link" onClick={() => openPhotoPreview('人脸照片', person.faceImage)}>查看照片</Button> : <span className="muted-text">未上传</span> },
+    { title: '健康证', key: 'healthReport', render: (_, person) => hasHealthCertificate(person) ? <Button type="link" onClick={() => openPhotoPreview('健康证照片', person.healthReport)}>查看照片</Button> : <span className="muted-text">未上传</span> },
+    { title: '有效期', dataIndex: 'healthReportExpiresAt', key: 'healthReportExpiresAt', render: (value) => value || '—' },
+    { title: '年龄', dataIndex: 'age', key: 'age', render: (value) => value == null ? '—' : `${value} 岁` },
     { title: '操作', key: 'action', render: (_, person) => <div className="table-actions"><Button type="link" onClick={() => setDrawer({ open: true, mode: 'view', person })}>查看</Button>{canEdit(person) && <Button type="link" icon={<EditOutlined />} onClick={() => setDrawer({ open: true, mode: 'edit', person })}>编辑</Button>}{person.accountBindingState !== 'unbound' && <Button type="link" onClick={() => openAccountDrawer(person)}>查看账号</Button>}{person.accountBindingState === 'unbound' && canManageAccountBinding && <Button type="link" onClick={() => openAccountDrawer(person)}>绑定账号</Button>}{person.accountBindingState !== 'unbound' && canManageAccountBinding && <Button type="link" danger onClick={() => openAccountDrawer(person)}>解绑</Button>}</div> },
   ];
 
-  return <div className="business-page">{messageContextHolder}<PageHeader title="人员档案" description="维护人员主档、项目关系、门禁资质与系统账号绑定关系；账号与门禁权限独立管理。" breadcrumb={['首页', '人员档案']} extra={user.role !== 'worker' && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawer({ open: true, mode: 'edit', person: { registered: false, projectOptions: projects.map((project) => ({ value: project.id, label: project.name })) } })}>新增人员</Button>} /><FilterBar onReset={() => setFilters({ name: '', projectId: 'all', accountState: 'all' })} onSearch={() => messageApi.success(`已查询 ${filtered.length} 人员`)}><Input placeholder="姓名" allowClear value={filters.name} onChange={(event) => setFilters({ ...filters, name: event.target.value })} /><Select value={filters.projectId} onChange={(projectId) => setFilters({ ...filters, projectId })} options={[{ value: 'all', label: '全部项目' }, ...projects.map((project) => ({ value: project.id, label: project.name }))]} /><Select aria-label="账号绑定状态筛选" value={filters.accountState} onChange={(accountState) => setFilters({ ...filters, accountState })} options={[{ value: 'all', label: '账号状态：全部' }, { value: 'bound', label: '账号状态：已绑定' }, { value: 'unbound', label: '账号状态：未绑定' }, { value: 'inactive', label: '账号状态：已停用' }]} /></FilterBar><Card className="table-card"><Table rowKey="id" columns={columns} dataSource={filtered} scroll={{ x: 1320 }} pagination={false} /></Card><PersonDrawer open={drawer.open} onClose={() => setDrawer({ ...drawer, open: false })} mode={drawer.mode} role={role} person={drawer.person || {}} peopleRecords={peopleRecords} people={people} onSubmit={savePerson} /><AccountBindingDrawer open={accountDrawer.open} person={selectedAccountPerson || {}} account={selectedAccount} bindableAccounts={bindableAccounts} projects={projects} canManage={canManageAccountBinding} onBind={handleBindAccount} onUnbind={handleUnbindAccount} onOpenPermissions={() => { closeAccountDrawer(); onNavigate?.('users'); }} onClose={closeAccountDrawer} /></div>;
-}
-
-function SpaceText({ age, permission, reason }) {
-  return <div><div>{age} 岁</div><StatusTag status={permission === '正常' ? 'success' : 'warning'} label={permission} /><div className="muted-text">{reason}</div></div>;
+  return <div className="business-page">{messageContextHolder}<PageHeader title="人员档案" description="维护人员主档、项目关系、门禁资质与系统账号绑定关系；账号与门禁权限独立管理。" breadcrumb={['首页', '人员档案']} extra={user.role !== 'worker' && <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawer({ open: true, mode: 'edit', person: { registered: false, projectOptions: projects.map((project) => ({ value: project.id, label: project.name })) } })}>新增人员</Button>} /><FilterBar onReset={() => setFilters({ name: '', projectId: 'all', accountState: 'all' })} onSearch={() => messageApi.success(`已查询 ${filtered.length} 人员`)}><Input placeholder="姓名" allowClear value={filters.name} onChange={(event) => setFilters({ ...filters, name: event.target.value })} /><Select value={filters.projectId} onChange={(projectId) => setFilters({ ...filters, projectId })} options={[{ value: 'all', label: '全部项目' }, ...projects.map((project) => ({ value: project.id, label: project.name }))]} /><Select aria-label="账号绑定状态筛选" value={filters.accountState} onChange={(accountState) => setFilters({ ...filters, accountState })} options={[{ value: 'all', label: '账号状态：全部' }, { value: 'bound', label: '账号状态：已绑定' }, { value: 'unbound', label: '账号状态：未绑定' }, { value: 'inactive', label: '账号状态：已停用' }]} /></FilterBar><Card className="table-card"><Table rowKey="id" columns={columns} dataSource={filtered} scroll={{ x: 1500 }} pagination={false} /></Card><PersonDrawer open={drawer.open} onClose={() => setDrawer({ ...drawer, open: false })} mode={drawer.mode} role={role} person={drawer.person || {}} peopleRecords={peopleRecords} people={people} onSubmit={savePerson} /><AccountBindingDrawer open={accountDrawer.open} person={selectedAccountPerson || {}} account={selectedAccount} bindableAccounts={bindableAccounts} projects={projects} canManage={canManageAccountBinding} onBind={handleBindAccount} onUnbind={handleUnbindAccount} onOpenPermissions={() => { closeAccountDrawer(); onNavigate?.('users'); }} onClose={closeAccountDrawer} /><Modal title={photoPreview.title} open={photoPreview.open} onCancel={closePhotoPreview} footer={null} destroyOnHidden>{photoPreview.src ? <Image src={photoPreview.src} alt={photoPreview.title} preview={false} style={{ maxWidth: '100%' }} /> : <div className="muted-text">暂无可预览的照片</div>}</Modal></div>;
 }
