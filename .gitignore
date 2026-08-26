@@ -16,6 +16,10 @@ dist/
 docs/
 workspace/source-materials/*
 !workspace/source-materials/CLAUDE.md
+.playwright-mcp/
+workspace/.npm-cache/
+workspace/__MACOSX/
+workspace/项目-质量安全管理平台/
 *.apk
 *.chm
 *.zip
