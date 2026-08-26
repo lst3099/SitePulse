@@ -38,7 +38,7 @@ git status --short
 git diff -- workspace/方案与原型MECE对照表.md
 ```
 
-Expected: `workspace/方案与原型MECE对照表.md`, `src/components/AppShell.test.jsx`, and `src/pages/PeoplePage.jsx` remain existing working-tree changes and are not included in implementation commits unless a task explicitly requires those files.
+Expected: `workspace/方案与原型MECE对照表.md`, `src/components/AppShell.test.jsx`, `src/components/PersonDrawer.jsx`, `src/pages/PeoplePage.jsx`, and `src/pages/pageUtils.js` remain existing working-tree changes and are not included in implementation commits unless a task explicitly requires those files.
 
 ### Task 2: Change attendance calculation to chronological first/last punches
 
@@ -593,7 +593,7 @@ git commit -m "docs: align scheme with attendance and access rules"
 
 **Files:**
 - Verify: all files changed in Tasks 2–6
-- Preserve: `workspace/方案与原型MECE对照表.md`, `src/components/AppShell.test.jsx`, and `src/pages/PeoplePage.jsx` as the user’s existing working-tree changes
+- Preserve: `workspace/方案与原型MECE对照表.md`, `src/components/AppShell.test.jsx`, `src/components/PersonDrawer.jsx`, `src/pages/PeoplePage.jsx`, and `src/pages/pageUtils.js` as the user’s existing working-tree changes
 
 - [ ] **Step 1: Run the complete test suite**
 
@@ -619,7 +619,7 @@ git status --short
 git diff --stat
 ```
 
-Confirm all new source/doc changes are committed, while the existing comparison-table, AppShell test, and PeoplePage changes remain untouched by implementation commits. If the dev server is still running, verify `http://localhost:5173/` returns HTTP 200.
+Confirm all new source/doc changes are committed, while the existing comparison-table, AppShell test, PersonDrawer, PeoplePage, and pageUtils changes remain untouched by implementation commits. If the dev server is still running, verify `http://localhost:5173/` returns HTTP 200.
 
 - [ ] **Step 4: Report evidence**
 
